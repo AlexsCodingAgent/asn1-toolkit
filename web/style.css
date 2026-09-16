@@ -280,3 +280,37 @@ code {
 
 .artefact-actions { display: flex; gap: 9px; margin-top: 12px; flex-wrap: wrap; }
 .artefact-actions button { font-size: .84rem; }
+
+/* ---------- shared-schema strip ---------- *
+ * Tabs 1-3 operate on one schema, and nothing said so: the fact was discoverable
+ * only by hitting "No type selected — put a schema in tab 1" after already
+ * trying. A persistent, clickable indicator makes the model self-evident.
+ */
+.schema-strip {
+  display: inline-flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+  margin: 2px 0 10px; padding: 6px 12px; cursor: pointer;
+  background: rgba(133,193,233,.07); border: 1px solid var(--line);
+  border-radius: 8px; font: inherit; font-size: .82rem; text-align: left;
+  color: var(--ink-dim); max-width: 100%;
+}
+.schema-strip:hover { border-color: var(--accent); }
+.schema-strip:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 1px; }
+.schema-strip-label {
+  color: var(--muted); text-transform: uppercase; letter-spacing: .1em;
+  font-size: .68rem; font-weight: 600;
+}
+.schema-strip-value { font-family: var(--mono); color: var(--accent); }
+.schema-strip-value.empty { color: var(--muted); font-style: italic; }
+.schema-strip-hint { color: var(--muted); font-size: .74rem; }
+
+/* ---------- error line marker (F4) ---------- *
+ * The parser reports "line N, column M" as prose in a panel below the editor,
+ * disconnected from the text. This band puts the signal on the line itself, using
+ * the same line-height and padding as the code so it lands exactly.
+ */
+.editor-wrap { position: relative; }
+.error-line-band {
+  position: absolute; left: 0; right: 0; z-index: 3; pointer-events: none;
+  background: rgba(242,139,130,.16);
+  border-left: 3px solid var(--bad);
+}

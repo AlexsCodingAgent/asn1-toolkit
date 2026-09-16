@@ -30,7 +30,7 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 // Single build stamp for every asset this page loads: the stylesheet, the wasm
 // binary, and the module URLs in index.html. Bump it on release so a redeploy is
 // never masked by a cached asset.
-const BUILD = '0.3.0';
+const BUILD = '0.4.0';
 
 
 // ---------------------------------------------------------------------------
@@ -195,6 +195,9 @@ function selectTab(id, { focus = false } = {}) {
   for (const btn of $$('nav.tabs button')) {
     const on = btn.id === 'tab-' + id;
     btn.setAttribute('aria-selected', String(on));
+    // ARIA tabs pattern: only the selected tab is in the tab order, so Tab moves
+    // into the panel rather than through every tab. Arrow keys move between tabs.
+    btn.setAttribute('tabindex', on ? '0' : '-1');
     const panel = $('#' + btn.getAttribute('aria-controls'));
     panel.hidden = !on;
     if (on && focus) btn.focus();
@@ -263,6 +266,7 @@ function runCompile() {
 
   if (!src.trim()) {
     $('#output').textContent = '';
+    clearErrorLine();
     setStatus(statusEl, 'err', 'Nothing to compile — the input is empty.');
     return;
   }
@@ -279,9 +283,12 @@ function runCompile() {
   if (!res.ok) {
     $('#output').textContent = '';
     setStatus(statusEl, 'err', 'Compilation failed.', res.error);
+    markErrorLine(res.error);          // F4: put the mark where the user is looking
     offerCleanupIfUseful(src, be);
     return;
   }
+
+  clearErrorLine();
 
   let text = res.output;
   let formatted = false;
@@ -349,6 +356,77 @@ function offerCleanupIfUseful(src, backend) {
   showCleanupOffer(src, analysis, result);
 }
 
+/** Keep the shared-schema indicator in step with the editor. */
+function updateSchemaStrip() {
+  const el = $('#schemaStripValue');
+  if (!el) return;
+  const src = editor.value.trim();
+  if (!src) {
+    el.textContent = 'empty';
+    el.classList.add('empty');
+    return;
+  }
+  let s;
+  try {
+    s = parseStructure(editor.value);
+  } catch {
+    s = null;
+  }
+  el.classList.remove('empty');
+  if (s && s.types.length) {
+    el.textContent = `${s.module || '(unnamed module)'} · ${s.types.length} type${s.types.length === 1 ? '' : 's'}`;
+  } else {
+    el.textContent = `${src.split('\n').length} lines (no types found)`;
+  }
+}
+
+/**
+ * Mark the line a compiler error refers to.
+ *
+ * The parser reports "line N, column M" as prose in a panel below the editor,
+ * which is disconnected from the text it describes — in a 400-line paste the user
+ * has to count lines. The highlight overlay is already rendered under the
+ * textarea, so marking the line there costs nothing and puts the signal where the
+ * user is looking.
+ */
+function markErrorLine(message) {
+  clearErrorLine();
+  if (!message) return;
+  const m = /line\s+(\d+)/i.exec(message);
+  if (!m) return;
+  const n = parseInt(m[1], 10);
+  if (!Number.isFinite(n) || n < 1) return;
+
+  const lines = editor.value.split('\n');
+  if (n > lines.length) return;
+
+  // Overlay a marker band at the right offset. Line-height and padding come from
+  // the same rules the text uses, so the band lands exactly on the line.
+  const spacing = 20.48;   // 12.8px * 1.6, see .code-surface
+  const pre = $('#inputHighlight');
+  const band = document.createElement('div');
+  band.className = 'error-line-band';
+  band.style.top = `calc(12px + ${(n - 1) * spacing}px)`;
+  band.style.height = spacing + 'px';
+  pre.parentElement.appendChild(band);
+  pre.parentElement.classList.add('has-error-line');
+
+  // Scroll the line into view so the mark is actually seen.
+  const target = (n - 1) * spacing;
+  if (target < editor.ta.scrollTop || target > editor.ta.scrollTop + editor.ta.clientHeight - spacing) {
+    editor.ta.scrollTop = Math.max(0, target - editor.ta.clientHeight / 3);
+    editor.sync();
+  }
+}
+
+function clearErrorLine() {
+  const wrap = editor?.ta?.closest('.editor-wrap');
+  if (!wrap) return;
+  wrap.querySelectorAll('.error-line-band').forEach((b) => b.remove());
+  wrap.classList.remove('has-error-line');
+}
+
+
 /** Human-readable summary of what kinds of artefact were found. */
 function summariseArtefacts(analysis) {
   const counts = {};
@@ -415,6 +493,7 @@ function showCleanupOffer(src, analysis, result) {
     editor.value = text;
     updateInputCount();
     refreshTypeList();
+    updateSchemaStrip();
     runCompile();
   });
 
@@ -755,13 +834,17 @@ function wireButtons() {
     $('#output').textContent = '';
     $('#outCount').textContent = '';
     clearStatus($('#status'));
+    clearErrorLine();                 // the error mark belongs to the cleared text
     updateInputCount();
     refreshTypeList();
+    updateSchemaStrip();
     editor.ta.focus();
   });
   $('#btnWrap').addEventListener('click', () => {
     const on = $('#output').classList.toggle('wrap');
-    $('#btnWrap').textContent = 'Wrap: ' + (on ? 'on' : 'off');
+    const btn = $('#btnWrap');
+    btn.textContent = 'Wrap output: ' + (on ? 'on' : 'off');
+    btn.setAttribute('aria-pressed', String(on));
   });
   $('#btnDownload').addEventListener('click', () => {
     const out = $('#output').textContent;
@@ -789,6 +872,7 @@ function wireButtons() {
   $('#btnStructExample').addEventListener('click', () => {
     editor.value = example_schema();
     refreshTypeList();
+    updateSchemaStrip();
     renderStructure();
   });
   $('#btnStructCopy').addEventListener('click', (e) => {
@@ -837,6 +921,14 @@ function wireButtons() {
   editor.ta.addEventListener('input', () => {
     updateInputCount();
     refreshTypeList();
+    updateSchemaStrip();
+    clearErrorLine();   // a stale mark on edited text points at the wrong line
+  });
+
+  // F3: the strip is the discovery path for the shared-schema model.
+  $('#schemaStrip').addEventListener('click', () => {
+    selectTab('compile', { focus: true });
+    editor.ta.focus();
   });
 }
 
@@ -876,6 +968,7 @@ async function boot() {
   editor.value = example_schema();
   updateInputCount();
   refreshTypeList();
+  updateSchemaStrip();
   runCompile();
 
   // Seed the other panels so no tab is empty on first visit.

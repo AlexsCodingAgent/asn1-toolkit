@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ASN.1 Toolkit — eUICC.tech</title>
 <meta name="description" content="Compile, inspect and encode ASN.1 from the GSMA eSIM specifications — SGP.02, SGP.22, SGP.32. Runs entirely in your browser; nothing is uploaded.">
-<link rel="stylesheet" href="./style.css?v=0.3.0">
+<link rel="stylesheet" href="./style.css?v=0.4.0">
 </head>
 <body>
 
@@ -18,6 +18,11 @@
       TypeScript, browse its structure, encode values to DER&nbsp;/&nbsp;BER&nbsp;/&nbsp;CER&nbsp;/&nbsp;PER,
       and decode raw bytes back into a tree.
     </p>
+    <button class="schema-strip" id="schemaStrip" title="Tabs 1-3 share this schema — click to edit it">
+      <span class="schema-strip-label">schema</span>
+      <span class="schema-strip-value" id="schemaStripValue">empty</span>
+      <span class="schema-strip-hint">edit in tab 1</span>
+    </button>
     <div class="badges">
       <span class="badge">wasm <b>✓</b> client-side only</span>
       <span class="badge">no network calls</span>
@@ -37,7 +42,7 @@
   <!-- ================= 1. COMPILER ================= -->
   <section class="panel" id="panel-compile" role="tabpanel" aria-labelledby="tab-compile">
     <div class="toolbar">
-      <label class="seg" title="Output language">
+      <label class="seg" role="radiogroup" aria-label="Output language" title="Output language">
         <input type="radio" name="backend" value="rust" checked><span>Rust</span>
         <input type="radio" name="backend" value="typescript"><span>TypeScript</span>
       </label>
@@ -46,7 +51,7 @@
       <button id="btnMinimal">Minimal</button>
       <button id="btnValidate">Validate only</button>
       <div class="spacer"></div>
-      <button id="btnWrap" title="Toggle soft wrapping of long lines">Wrap: on</button>
+      <button id="btnWrap" title="Toggle soft wrapping of the output pane" aria-pressed="true">Wrap output: on</button>
       <button id="btnClearCompiler">Clear</button>
     </div>
 
@@ -76,7 +81,7 @@
       </div>
     </div>
 
-    <div class="status" id="status"></div>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
 
     <details class="note">
       <summary>About the compiler</summary>
@@ -131,7 +136,7 @@
     <div class="toolbar">
       <button class="primary" id="btnStructure">Analyse</button>
       <button id="btnStructExample">SGP.22 example</button>
-      <label class="seg" title="Filter the type list">
+      <label class="seg" role="radiogroup" aria-label="Filter the type list" title="Filter the type list">
         <input type="radio" name="sview" value="tree" checked><span>Grouped</span>
         <input type="radio" name="sview" value="flat"><span>All types</span>
       </label>
@@ -149,7 +154,7 @@
       </div>
       <div class="tree" id="structure" data-empty="Press Analyse to read the schema."></div>
     </div>
-    <div class="status" id="statusStruct"></div>
+    <div class="status" id="statusStruct" role="status" aria-live="polite"></div>
     <details class="note">
       <summary>How the structure view works, and its limits</summary>
       <div class="body">
@@ -183,7 +188,7 @@
   <section class="panel" id="panel-encode" role="tabpanel" aria-labelledby="tab-encode" hidden>
     <div class="toolbar">
       <button class="primary" id="btnEncode">Encode</button>
-      <label class="seg" title="Encoding rules">
+      <label class="seg" role="radiogroup" aria-label="Encoding rules" title="Encoding rules">
         <input type="radio" name="rules" value="DER" checked><span>DER</span>
         <input type="radio" name="rules" value="BER"><span>BER</span>
         <input type="radio" name="rules" value="CER"><span>CER</span>
@@ -221,7 +226,7 @@
         <pre class="out" id="encOutput" data-empty="Encoded bytes appear here."></pre>
       </div>
     </div>
-    <div class="status" id="statusEncode"></div>
+    <div class="status" id="statusEncode" role="status" aria-live="polite"></div>
     <details class="note">
       <summary>Encoding rules: what is implemented, and what is not</summary>
       <div class="body">
@@ -298,7 +303,7 @@
         <pre class="out" id="treeOutput" data-empty="The decoded tree appears here."></pre>
       </div>
     </div>
-    <div class="status" id="statusDecode"></div>
+    <div class="status" id="statusDecode" role="status" aria-live="polite"></div>
     <details class="note" id="lookalikeNote">
       <summary>The TLV-lookalike trap — read this before trusting a decode</summary>
       <div class="body">
@@ -339,6 +344,6 @@ actual structure: el(0x83, len=11)
   </section>
 </main>
 
-<script type="module" src="./app.js?v=0.3.0"></script>
+<script type="module" src="./app.js?v=0.4.0"></script>
 </body>
 </html>

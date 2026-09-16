@@ -127,12 +127,44 @@ pub fn decode_tlv(hex: &str) -> DecodeResult {
     let consumed = pos;
     let trailing = consumed < total;
 
+    // Leftover bytes are an ERROR, not an advisory.
+    //
+    // The distinction that matters: a blob consumed *entirely* as sibling
+    // top-level elements is correct (30 03 02 01 05 02 01 09 is two siblings, and
+    // is read as such). Bytes the loop could not parse mean the input is not what
+    // the user believes it is, which is the precise class of mistake this tool
+    // exists to catch. Reporting that as "decoded with caveats" and still showing
+    // a tree invites the user to trust a tree that does not describe their data.
     if trailing {
-        notes.push(format!(
-            "{} trailing byte(s) after the last complete element. Either the input \
-             contains more than one top-level value, or it is truncated.",
-            total - consumed
-        ));
+        let left = total - consumed;
+        let detail = if nodes.is_empty() {
+            format!(
+                "Nothing decoded: the first byte at offset 0 is not a valid tag, or the \
+                 length is malformed. {} byte(s) unread.",
+                total
+            )
+        } else {
+            format!(
+                "{} byte(s) left over after the last complete element, starting at offset {} \
+                 (0x{}). The input is either not ASN.1 in the scheme this decoder uses, or it \
+                 is truncated — either way the tree above does not describe all of your data.",
+                left,
+                consumed,
+                bytes
+                    .get(consumed)
+                    .map(|b| format!("{b:02x}"))
+                    .unwrap_or_else(|| "--".into())
+            )
+        };
+        return DecodeResult {
+            ok: false,
+            error: detail,
+            nodes: Vec::new(),
+            consumed,
+            total,
+            trailing: true,
+            notes: Vec::new(),
+        };
     }
 
     // Depth advisory: deep nesting on a short blob usually means a misread.
