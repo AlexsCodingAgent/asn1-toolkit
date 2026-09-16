@@ -23,6 +23,7 @@ import { parseStructure } from './structure.js';
 import { encodeValue, encodeValuePer, toHex, valueTemplate, RULES } from './encode.js';
 import { highlightAsn1, highlightHex, hexByteCount } from './highlight.js';
 import { analyseArtefacts, cleanArtefacts, cleanWouldHelp } from './clean.js';
+import { annotate, prepareSchema, parseTagExpr } from './schemadecode.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -30,7 +31,42 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 // Single build stamp for every asset this page loads: the stylesheet, the wasm
 // binary, and the module URLs in index.html. Bump it on release so a redeploy is
 // never masked by a cached asset.
-const BUILD = '0.5.0';
+/**
+ * Parsed schemas keyed by their exact source text.
+ *
+ * runDecode() consults the schema on every decode, and parseStructure over a whole
+ * GSMA spec is not cheap. Keying on the source means an unchanged editor costs one
+ * Map lookup, and any edit produces a new key rather than a stale hit.
+ *
+ * Bounded because a session can accumulate keys as the editor is typed in, and the
+ * parsed form of a 200 KB spec is not something to hold onto indefinitely.
+ */
+const schemaCache = (() => {
+  const m = new Map();
+  const LIMIT = 4;
+  return {
+    get(src) {
+      if (m.has(src)) {
+        const v = m.get(src);
+        m.delete(src); m.set(src, v);      // refresh recency
+        return v;
+      }
+      let parsed;
+      try {
+        parsed = prepareSchema(parseStructure(src));
+      } catch {
+        parsed = null;                     // an unparseable schema simply does not match
+      }
+      m.set(src, parsed);
+      if (m.size > LIMIT) m.delete(m.keys().next().value);
+      return parsed;
+    },
+  };
+})();
+
+let lastDecodeResult = null;
+
+const BUILD = '0.7.0';
 
 
 // ---------------------------------------------------------------------------
@@ -173,13 +209,22 @@ function makeEditor(textareaId, highlightId, highlightFn) {
     pre.scrollLeft = ta.scrollLeft;
   };
 
-  ta.addEventListener('input', render);
+  ta.addEventListener('input', () => {
+    // Typing hex by hand means these bytes are no longer whatever the encoder last
+    // produced, so the inspector must stop claiming to know their type.
+    //
+    // Only the hex editor is affected. The ASN.1 editor's staleness is handled where
+    // the encoder records the type, because a schema edit does not change the bytes.
+    if (textareaId === 'hexInput') lastEncoded = null;
+    render();
+  });
   ta.addEventListener('scroll', sync);
   window.addEventListener('resize', sync);
 
   return {
     ta, pre,
     get value() { return ta.value; },
+
     set value(v) { ta.value = v; render(); sync(); },
     render, sync,
   };
@@ -313,6 +358,148 @@ function runCompile() {
   } else {
     setStatus(statusEl, 'ok', parts.join(' '));
   }
+}
+
+/**
+ * Name the decoded bytes against the loaded schema, if a confident match exists.
+ *
+ * CHOOSING A ROOT IS THE RISKY PART
+ *
+ * There can be hundreds of types and no user-declared starting point. Guessing the
+ * wrong root would label correct bytes with wrong field names, which is worse than
+ * leaving them unlabelled: a wrong name is indistinguishable from a right one.
+ *
+ * So the guess is deliberately narrow. A candidate is accepted only when its
+ * outermost tag matches the root element's tag AND every element it names fits
+ * inside the bytes present. Ties are resolved by which candidate names more of the
+ * tree, and a tie for first place means no annotation at all.
+ */
+function annotateIfPossible(res) {
+  // Clear first. Without this a decode that matches nothing leaves the PREVIOUS
+  // match in place, so the status bar names one type while the tree shows another -
+  // a wrong answer presented with full confidence.
+  lastAnnotation = null;
+  const fallback = { nodes: res.nodes };
+  try {
+    const src = editor.value;
+    if (!src || !src.trim()) return fallback;
+    if (!res.nodes || !res.nodes.length) return fallback;
+
+    const schema = schemaCache.get(src);
+    if (!schema || !schema.types || !schema.types.length) return fallback;
+
+    // An explicit choice in the picker wins over everything. The reader has said
+    // what these bytes are; second-guessing that would be the tool arguing with its
+    // user. If the type does not fit, the tree simply stays unannotated.
+    const chosen = $('#decodeTypeSelect')?.value;
+    if (chosen) {
+      const exact = annotate(res, schema, chosen);
+      if (exact.ok) {
+        lastAnnotation = { ...exact, chosen: true };
+        return lastAnnotation;
+      }
+      return fallback;
+    }
+
+    // If these bytes came from the encoder, the type is KNOWN - no guessing, and no
+    // tie to break. This is the common path when working between the two tabs.
+    if (lastEncoded) {
+      const exact = annotate(res, schema, lastEncoded.type);
+      if (exact.ok && exact.named > 0) {
+        lastAnnotation = { ...exact, exact: true };
+        return lastAnnotation;
+      }
+    }
+
+    const root = res.nodes[0];
+    const rootClass = String(root.class || '').toLowerCase().replace(/[^a-z]/g, '');
+    const rootTag = Number(root.tag);
+
+    // Candidate roots: the outermost element must match the type's own tag, or be a
+    // universal SEQUENCE/SET for an untagged SEQUENCE/SET type.
+    const candidates = [];
+    for (const t of schema.types) {
+      const want = rootTagFor(t);
+      if (!want) continue;
+      if (want.class === rootClass && want.number === rootTag) candidates.push(t);
+    }
+    if (!candidates.length) return fallback;
+
+    let best = null;
+    let bestScore = -1;
+    let tied = false;
+    for (const t of candidates) {
+      const r = annotate(res, schema, t.name);
+      if (!r.ok) continue;
+
+      // Score by BYTE COVERAGE, not by counting elements.
+      //
+      // Two different SEQUENCE types can name the same number of fields for short
+      // input - OperatorId and AuthenticateServerRequest both named two of the eight
+      // bytes here - so a count-based score tied and the tool refused to annotate
+      // either. What actually distinguishes them is how much of the data each
+      // accounts for: OperatorId's [0],[1] cover every octet present, while the
+      // wider type leaves bytes over. Coverage separates them cleanly.
+      const score = r.named * 1000 + (r.covered || 0) - (r.uncovered || 0);
+      if (score > bestScore) { best = r; bestScore = score; tied = false; }
+      else if (score === bestScore) { tied = true; }
+    }
+
+    // No candidate explained anything, or two fitted equally well: refuse rather
+    // than pick arbitrarily. A wrong field name is indistinguishable from a right
+    // one, so an unannotated tree is the safer answer.
+    if (!best || bestScore <= 0 || tied) return fallback;
+
+    lastAnnotation = best;
+    return best;
+  } catch {
+    // A schema the annotator cannot make sense of must never break decoding. The
+    // structural tree is the primary answer and it is already correct.
+    return fallback;
+  }
+}
+
+/** The tag a type's own outermost element carries, or null if it declares none. */
+function rootTagFor(type) {
+  const explicit = parseTagExpr(type.tag);
+  if (explicit) return explicit;
+  // A named built-in root (`SomeSeq ::= SEQUENCE { ... }`) is universal.
+  const kind = String(type.kind || '').toUpperCase();
+  if (kind === 'SEQUENCE') return { class: 'universal', number: 16 };
+  if (kind === 'SET') return { class: 'universal', number: 17 };
+  const builtin = { 'OCTET STRING': 4, OCTETSTRING: 4, INTEGER: 2, 'UTF8 STRING': 12, UTF8STRING: 12, BOOLEAN: 1 };
+  if (builtin[kind]) return { class: 'universal', number: builtin[kind] };
+  return null;
+}
+
+/**
+ * Summary line describing what the annotation matched, for the status area.
+ * Returns '' when nothing was named, so the caller shows nothing.
+ */
+function annotationSummary() {
+  if (!lastAnnotation || !lastAnnotation.named) return '';
+  const types = lastAnnotation.typesUsed || [];
+  const fields = lastAnnotation.fieldNames || 0;
+  const typePart = types.length > 1
+    ? ` (with ${types.length - 1} nested type${types.length > 2 ? 's' : ''})`
+    : '';
+  // A top-level leaf names a type and no fields, so do not say "0 fields named".
+  const fieldPart = fields
+    ? `, ${fields} field${fields === 1 ? '' : 's'} named`
+    : '';
+  return `Matched against the loaded schema: ${lastAnnotation.rootType}${typePart}${fieldPart}`;
+}
+
+let lastAnnotation = null;
+
+/**
+ * Re-annotate after anything that could change the schema or the bytes, without
+ * re-running the decode.
+ */
+function refreshAnnotation() {
+  if (!lastDecodeResult) return;
+  lastAnnotation = null;
+  runDecode();
 }
 
 /**
@@ -492,7 +679,7 @@ function showCleanupOffer(src, analysis, result) {
     const { text } = cleanArtefacts(editor.value);
     editor.value = text;
     updateInputCount();
-    refreshTypeList();
+    refreshTypeList(); refreshDecodeTypeList();
     updateSchemaStrip();
     runCompile();
   });
@@ -663,6 +850,33 @@ function structureSummary() {
 // Panel 3 — encoder
 // ---------------------------------------------------------------------------
 
+/**
+ * Keep the inspector's type picker in step with the schema.
+ *
+ * Matching a root from its outermost tag alone is ambiguous in practice: [0] plus
+ * [1] is equally consistent with OperatorId and AuthenticateServerRequest, so the
+ * automatic matcher correctly refuses rather than guess. Without a way to state the
+ * type, the reader is stuck - three tabs of ASN.1 and no way to say which one they
+ * mean. This is that way, and it is a deliberate choice rather than a fallback.
+ */
+function refreshDecodeTypeList() {
+  const sel = $('#decodeTypeSelect');
+  if (!sel) return;
+  const prev = sel.value;
+  let types = [];
+  try {
+    types = parseStructure(editor.value).types || [];
+  } catch {
+    types = [];
+  }
+  const named = types.filter((t) => (t.fields && t.fields.length) || t.typeName);
+  named.sort((a, b) => (b.fields.length ? 1 : 0) - (a.fields.length ? 1 : 0)
+    || a.name.localeCompare(b.name));
+  sel.innerHTML = '<option value="">Auto — match from the tag</option>'
+    + named.map((t) => `<option value="${t.name}">${t.name}${t.fields.length ? ` (${t.fields.length})` : ''}</option>`).join('');
+  if (named.some((t) => t.name === prev)) sel.value = prev;
+}
+
 function refreshTypeList() {
   const sel = $('#typeSelect');
   const prev = sel.value;
@@ -743,7 +957,14 @@ function runEncode() {
   const note = RULES.find((r) => r.id === rules)?.note || '';
   setStatus(statusEl, 'ok',
     `${bytes.length} byte${bytes.length === 1 ? '' : 's'} in ${rules}. ${note}`);
+
+  // Remember what was encoded, so "Inspect bytes" can tell the inspector which type
+  // to expect rather than leaving it to guess a root from hundreds of candidates.
+  lastEncoded = { type: name, rule: rules };
 }
+
+/** The type whose encoding is currently in the inspector, if it came from the encoder. */
+let lastEncoded = null;
 
 // ---------------------------------------------------------------------------
 // Panel 4 — byte inspector
@@ -769,6 +990,7 @@ function runDecode() {
   let res;
   try {
     res = hex_to_tree(hex);
+    lastDecodeResult = res;
   } catch (e) {
     $('#treeOutput').textContent = '';
     setStatus(statusEl, 'err', 'Decoder crashed: ' + (e?.message ?? String(e)));
@@ -782,18 +1004,34 @@ function runDecode() {
     return;
   }
 
+  // Try to name the bytes against the loaded schema. This is the step that turns
+  // "APPLICATION 26 len=10" into "iccid: Iccid = ...", which is the question a
+  // reader with hex off a live eUICC actually has.
+  //
+  // Failure is silent by design: an unannotated tree is still correct and useful,
+  // and an error box about a missing schema would be noise for anyone decoding
+  // bytes they never had a schema for.
+  const annotated = annotateIfPossible(res);
+
   const lines = [];
   const dump = (node, depth) => {
     const pad = '  '.repeat(depth);
     const kind = node.constructed ? 'cons' : 'prim';
-    let line = `${pad}${node.class} ${node.tag} (${kind}) len=${node.content_len} @${node.offset}`;
+    // Once a node is named, the name leads — it is the reason the reader is here.
+    // The raw tag stays visible after it, because knowing which tag matched is how
+    // you check the tool rather than trusting it.
+    const label = node.fieldName ? `${node.fieldName}: ` : '';
+    const type = node.typeName ? `${node.typeName}` : '';
+    let line = `${pad}${label}${type ? type + ' ' : ''}${node.class} ${node.tag} (${kind}) len=${node.content_len} @${node.offset}`;
     if (node.value_text) line += `  "${node.value_text}"`;
     else if (node.value_hex) line += `  [${node.value_hex}]`;
+    if (node.optional) line += '   (OPTIONAL, present)';
+    if (node.elementType) line += `   (element type ${node.elementType})`;
     lines.push(line);
     for (const note of node.notes || []) lines.push(`${pad}  ! ${note}`);
     for (const c of node.children) dump(c, depth + 1);
   };
-  for (const n of res.nodes) dump(n, 0);
+  for (const n of annotated.nodes) dump(n, 0);
 
   if (res.notes?.length) {
     lines.push('');
@@ -801,7 +1039,7 @@ function runDecode() {
   }
 
   $('#treeOutput').textContent = lines.join('\n');
-  const top = res.nodes.length;
+  const top = annotated.nodes.length;
   $('#treeCount').textContent = `${top} top-level element${top === 1 ? '' : 's'}, ${res.consumed}/${res.total} bytes`;
 
   if (res.notes?.length) {
@@ -815,8 +1053,54 @@ function runDecode() {
       note.open = true;
     }
   } else {
-    setStatus(statusEl, 'ok', `Decoded ${res.consumed} byte${res.consumed === 1 ? '' : 's'}.`);
+    // Say what the bytes were matched against. Without this the tree simply has
+    // unexplained names in it and the reader cannot tell how they were derived —
+    // or whether the tool guessed.
+    const summary = annotationSummary();
+    if (summary) {
+      setStatus(statusEl, 'ok',
+        `Decoded ${res.consumed} byte${res.consumed === 1 ? '' : 's'}. ${summary}.`,
+        annotationExplanation());
+    } else {
+      setStatus(statusEl, 'ok', `Decoded ${res.consumed} byte${res.consumed === 1 ? '' : 's'}.`);
+    }
   }
+}
+
+/**
+ * Explain how the names were arrived at, and be honest when it is partial.
+ *
+ * Saying "confirmed by every field lining up" while only the root was identified
+ * would be a claim the tool has not earned. Partial matches are the normal case for
+ * data that was not encoded with AUTOMATIC TAGS, and the reader needs to know that
+ * an unlabelled child is a deliberate refusal rather than an omission.
+ */
+function annotationExplanation() {
+  if (!lastAnnotation) return '';
+  if (lastAnnotation.chosen) {
+    return 'Using the type you selected. Set the picker back to Auto to have the '
+      + 'outermost tag matched against the schema instead.';
+  }
+  if (lastAnnotation.exact) {
+    return 'The type is the one you encoded, so no matching was needed.';
+  }
+  const unnamed = lastAnnotation.unnamed || 0;
+  const fields = lastAnnotation.fieldNames || 0;
+  const parts = [
+    'Identified by the outermost tag, then each element matched against the schema.',
+  ];
+  if (!fields && !unnamed) {
+    parts.push('This type has no fields, so the name is the whole answer.');
+  } else if (unnamed > 0) {
+    parts.push(
+      `Elements the schema does not account for are left unnamed on purpose: ` +
+      `a wrong field name is indistinguishable from a right one. ` +
+      `AUTOMATIC TAGS renumbers inline fields, so bytes tagged UNIVERSAL often ` +
+      `belong to a field the schema declares as a context tag.`
+    );
+  }
+  parts.push('If this is not the type you meant, name it in the Encoder tab and use Inspect bytes.');
+  return parts.join(' ');
 }
 
 // ---------------------------------------------------------------------------
@@ -827,8 +1111,8 @@ function wireButtons() {
   // Panel 1
   $('#btnCompile').addEventListener('click', runCompile);
   $('#btnValidate').addEventListener('click', runValidate);
-  $('#btnExample').addEventListener('click', () => { editor.value = example_schema(); refreshTypeList(); runCompile(); });
-  $('#btnMinimal').addEventListener('click', () => { editor.value = example_minimal(); refreshTypeList(); runCompile(); });
+  $('#btnExample').addEventListener('click', () => { editor.value = example_schema(); refreshTypeList(); refreshDecodeTypeList(); runCompile(); });
+  $('#btnMinimal').addEventListener('click', () => { editor.value = example_minimal(); refreshTypeList(); refreshDecodeTypeList(); runCompile(); });
   $('#btnClearCompiler').addEventListener('click', () => {
     editor.value = '';
     $('#output').textContent = '';
@@ -836,7 +1120,7 @@ function wireButtons() {
     clearStatus($('#status'));
     clearErrorLine();                 // the error mark belongs to the cleared text
     updateInputCount();
-    refreshTypeList();
+    refreshTypeList(); refreshDecodeTypeList();
     updateSchemaStrip();
     editor.ta.focus();
   });
@@ -871,7 +1155,7 @@ function wireButtons() {
   $('#btnStructure').addEventListener('click', renderStructure);
   $('#btnStructExample').addEventListener('click', () => {
     editor.value = example_schema();
-    refreshTypeList();
+    refreshTypeList(); refreshDecodeTypeList();
     updateSchemaStrip();
     renderStructure();
   });
@@ -903,9 +1187,12 @@ function wireButtons() {
 
   // Panel 4
   $('#btnDecode').addEventListener('click', runDecode);
-  $('#btnHexExample').addEventListener('click', () => { hexEditor.value = example_hex(); renderHexEditor(); runDecode(); });
-  $('#btnHexNested').addEventListener('click', () => { hexEditor.value = example_hex_nested(); renderHexEditor(); runDecode(); });
-  $('#btnHexLookalike').addEventListener('click', () => { hexEditor.value = example_hex_lookalike(); renderHexEditor(); runDecode(); });
+  // Choosing a type is an instruction, so re-decode immediately rather than making
+  // the reader press Decode again.
+  $('#decodeTypeSelect')?.addEventListener('change', () => { runDecode(); });
+  $('#btnHexExample').addEventListener('click', () => { hexEditor.value = example_hex(); renderHexEditor(); lastEncoded = null; runDecode(); });
+  $('#btnHexNested').addEventListener('click', () => { hexEditor.value = example_hex_nested(); renderHexEditor(); lastEncoded = null; runDecode(); });
+  $('#btnHexLookalike').addEventListener('click', () => { hexEditor.value = example_hex_lookalike(); renderHexEditor(); lastEncoded = null; runDecode(); });
   $('#btnHexClear').addEventListener('click', () => {
     hexEditor.value = '';
     $('#treeOutput').textContent = '';
@@ -920,7 +1207,7 @@ function wireButtons() {
   // Keep the encoder's type list in step with the schema in tab 1.
   editor.ta.addEventListener('input', () => {
     updateInputCount();
-    refreshTypeList();
+    refreshTypeList(); refreshDecodeTypeList();
     updateSchemaStrip();
     clearErrorLine();   // a stale mark on edited text points at the wrong line
   });
@@ -967,7 +1254,8 @@ async function boot() {
 
   editor.value = example_schema();
   updateInputCount();
-  refreshTypeList();
+  refreshTypeList(); refreshDecodeTypeList();
+  refreshDecodeTypeList();
   updateSchemaStrip();
   runCompile();
 

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ASN.1 Toolkit — eUICC.tech</title>
 <meta name="description" content="Compile, inspect and encode ASN.1 from the GSMA eSIM specifications — SGP.02, SGP.22, SGP.32. Runs entirely in your browser; nothing is uploaded.">
-<link rel="stylesheet" href="./style.css?v=0.5.0">
+<link rel="stylesheet" href="./style.css?v=0.7.0">
 </head>
 <body>
 
@@ -268,6 +268,12 @@
   <section class="panel" id="panel-decode" role="tabpanel" aria-labelledby="tab-decode" hidden>
     <div class="toolbar">
       <button class="primary" id="btnDecode">Decode</button>
+      <label class="visually-hidden" for="decodeTypeSelect">Type to decode as</label>
+      <select id="decodeTypeSelect" aria-label="Type to decode as"
+              title="Name the type these bytes are. Leave on Auto to match it from the outermost tag."
+              style="font:inherit;font-size:.85rem;padding:6px 10px;border-radius:8px;background:var(--panel);color:var(--ink-dim);border:1px solid var(--line)">
+        <option value="">Auto — match from the tag</option>
+      </select>
       <button id="btnHexExample">SGP.22 OperatorId</button>
       <button id="btnHexNested">Nested</button>
       <button id="btnHexLookalike" title="Not ASN.1 — demonstrates the trap">Profile Element *</button>
@@ -344,6 +350,6 @@ actual structure: el(0x83, len=11)
   </section>
 </main>
 
-<script type="module" src="./app.js?v=0.5.0"></script>
+<script type="module" src="./app.js?v=0.7.0"></script>
 </body>
 </html>
