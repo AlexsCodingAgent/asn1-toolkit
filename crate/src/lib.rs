@@ -1,27 +1,44 @@
-//! ASN.1 → Rust / TypeScript compiler, compiled to WebAssembly.
+//! ASN.1 toolkit for the browser: compile, introspect, decode.
 //!
-//! Runs entirely in the browser: no server, no upload, no network. The schema
-//! never leaves the user's machine, which is the point — schemas from GSMA
-//! specs are often not redistributable.
+//! Scope note, because it shapes the whole design:
 //!
-//! Built for eUICC.tech.
+//! `rasn`'s codecs are generic over `T: Encode`, where `T` is a Rust type known
+//! at compile time. There is no dynamic value type — `rasn::types::Any` is an
+//! opaque byte wrapper with no structure. A browser therefore *cannot* take an
+//! arbitrary schema and encode an arbitrary value from it, because that would
+//! require compiling Rust at runtime.
+//!
+//! So the division of labour is:
+//!
+//!   - **Here (Rust/WASM):** parsing, validation, code generation, schema
+//!     introspection, and DER *decoding* — decoding is possible without a
+//!     generated type because we read the TLV structure directly and report it
+//!     as data rather than as a typed Rust value.
+//!   - **In JavaScript (`web/encode.js`):** encoding, driven by the parsed
+//!     schema. A TLV writer is straightforward and needs no type system.
+//!
+//! This is stated here rather than discovered later because the instinct is to
+//! look for a "encode from schema" function, and its absence is deliberate.
 
 use rasn_compiler::prelude::*;
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
-/// Result of a compile attempt, serialised to JS as a plain object.
-#[derive(serde::Serialize)]
+mod hexdump;
+
+pub use hexdump::{TlvNode, decode_tlv};
+
+// ---------------------------------------------------------------------------
+// Code generation (existing behaviour)
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize)]
 struct Outcome {
     ok: bool,
-    /// Generated bindings, when `ok`.
     output: String,
-    /// Warning diagnostics (compile succeeded, but something is worth saying).
     warnings: Vec<String>,
-    /// Error diagnostic, when `!ok`.
     error: String,
-    /// Which backend produced `output`: "rust" or "typescript".
     backend: String,
-    /// Line count of the generated output, for a quick "did it do anything?" read.
     lines: usize,
 }
 
@@ -31,13 +48,7 @@ impl Outcome {
     }
 }
 
-fn warnings_from(w: &[CompilerError]) -> Vec<String> {
-    w.iter().map(|e| e.to_string()).collect()
-}
-
-/// Compile ASN.1 source to Rust bindings for the `rasn` framework.
-///
-/// `backend` is either "rust" or "typescript".
+/// Compile ASN.1 source to bindings. `backend` is "rust" or "typescript".
 #[wasm_bindgen]
 pub fn compile(asn1: &str, backend: &str) -> JsValue {
     console_error_panic_hook::set_once();
@@ -55,18 +66,18 @@ pub fn compile(asn1: &str, backend: &str) -> JsValue {
     }
 
     match backend {
-        "typescript" => {
-            let result = Compiler::<TypescriptBackend, _>::new_with_config(TsConfig::default())
+        "typescript" => finish(
+            Compiler::<TypescriptBackend, _>::new_with_config(TsConfig::default())
                 .add_asn_literal(asn1)
-                .compile_to_string();
-            finish(result, "typescript")
-        }
-        _ => {
-            let result = Compiler::<RasnBackend, _>::new_with_config(RasnConfig::default())
+                .compile_to_string(),
+            "typescript",
+        ),
+        _ => finish(
+            Compiler::<RasnBackend, _>::new_with_config(RasnConfig::default())
                 .add_asn_literal(asn1)
-                .compile_to_string();
-            finish(result, "rust")
-        }
+                .compile_to_string(),
+            "rust",
+        ),
     }
 }
 
@@ -77,7 +88,7 @@ fn finish(result: Result<CompileResult, CompilerError>, backend: &str) -> JsValu
             Outcome {
                 ok: true,
                 output: res.generated,
-                warnings: warnings_from(&res.warnings),
+                warnings: res.warnings.iter().map(|w| w.to_string()).collect(),
                 error: String::new(),
                 backend: backend.into(),
                 lines,
@@ -88,7 +99,6 @@ fn finish(result: Result<CompileResult, CompilerError>, backend: &str) -> JsValu
             ok: false,
             output: String::new(),
             warnings: vec![],
-            // The Display impl carries the "line N, column M" diagnostics.
             error: e.to_string(),
             backend: backend.into(),
             lines: 0,
@@ -97,10 +107,109 @@ fn finish(result: Result<CompileResult, CompilerError>, backend: &str) -> JsValu
     }
 }
 
+/// Schema structure is extracted in JavaScript, not here — see web/structure.js
+/// for the full reasoning. In short: rasn-compiler 0.16 has no public path from
+/// ASN.1 text to parsed types. `Compiler.state` is private with no accessor, the
+/// `lexer` module (holding the parser entry point) is private, and `compile()`
+/// consumes `self` and returns only generated text. The intermediate types are
+/// public as types, but nothing hands you an instance.
+///
+/// `validate` therefore uses `compile()` as the front end: if code generation
+/// succeeds, the module parsed. That is a weaker check than parsing alone (a
+/// module can parse and still fail generation) and is labelled as such in the UI.
+
+/// WASM export: decode hex bytes into a TLV tree.
+#[wasm_bindgen]
+pub fn hex_to_tree(hex: &str) -> JsValue {
+    console_error_panic_hook::set_once();
+    hexdump::decode_to_tree(hex)
+}
+
+/// A valid DER sample for the hex inspector: SGP.22 `OperatorId` with mccMnc
+/// 246/81, the worked example from SGP.22 §5.7.2.
+#[wasm_bindgen]
+pub fn example_hex() -> String {
+    // SEQUENCE { OCTET STRING (3) 92 F9 18 }  -- mccMnc, 2-digit MNC
+    "30 05 04 03 92 f9 18".to_string()
+}
+
+/// A second sample: the same structure with a 3-digit MNC, to show that the
+/// ASN.1 layer cannot tell the two apart — the third digit lives inside the
+/// OCTET STRING and only TS 24.008 explains the packing.
+#[wasm_bindgen]
+pub fn example_hex_3digit() -> String {
+    // SEQUENCE { OCTET STRING (3) 92 29 18 }  -- mccMnc, 3-digit MNC
+    "30 05 04 03 92 29 18".to_string()
+}
+
+/// A sample that is NOT ASN.1, to demonstrate the lookalike trap: real SGP.22
+/// Profile Element bytes. A BER reader returns one opaque primitive and no
+/// error, which is the whole hazard.
+#[wasm_bindgen]
+pub fn example_hex_lookalike() -> String {
+    "83 0b 80 09 08 29 99 18 11 32 54 76 98".to_string()
+}
+
+/// A nested DER sample: SEQUENCE containing INTEGER, BOOLEAN and UTF8String, so
+/// the tree view has something to expand.
+///
+/// Length byte is 0x0E (14 content bytes): INTEGER 4 + BOOLEAN 3 + UTF8String 7.
+#[wasm_bindgen]
+pub fn example_hex_nested() -> String {
+    // SEQUENCE {
+    //   id     INTEGER 0x1234,
+    //   active BOOLEAN true,
+    //   label  UTF8String "euicc"
+    // }
+    "30 0e 02 02 12 34 01 01 ff 0c 05 65 75 69 63 63".to_string()
+}
+
 /// The version of the underlying compiler, for display in the UI.
 #[wasm_bindgen]
 pub fn compiler_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+/// Validate only: reports whether the module parses and can be generated.
+///
+/// Uses the compiler front end rather than a dedicated parse, because the parsed
+/// module is not reachable through the public API. A success here means "parsed
+/// and generated", which is slightly stronger than "parsed" — noted in the UI so
+/// the distinction is not overstated.
+#[wasm_bindgen]
+pub fn validate(asn1: &str) -> JsValue {
+    #[derive(Serialize)]
+    struct Check {
+        ok: bool,
+        error: String,
+        warnings: usize,
+    }
+
+    if asn1.trim().is_empty() {
+        return serde_wasm_bindgen::to_value(&Check {
+            ok: false,
+            error: "No ASN.1 source provided.".into(),
+            warnings: 0,
+        })
+        .unwrap_or(JsValue::NULL);
+    }
+
+    match Compiler::<RasnBackend, _>::new_with_config(RasnConfig::default())
+        .add_asn_literal(asn1)
+        .compile_to_string()
+    {
+        Ok(r) => serde_wasm_bindgen::to_value(&Check {
+            ok: true,
+            error: String::new(),
+            warnings: r.warnings.len(),
+        }),
+        Err(e) => serde_wasm_bindgen::to_value(&Check {
+            ok: false,
+            error: e.to_string(),
+            warnings: 0,
+        }),
+    }
+    .unwrap_or(JsValue::NULL)
 }
 
 /// Compiled-in example: a valid subset of SGP.22's RSPDefinitions.
@@ -109,56 +218,23 @@ pub fn compiler_version() -> String {
 /// not compile (wrapped prose inside comments, OIDs broken across lines).
 #[wasm_bindgen]
 pub fn example_schema() -> String {
-    const SGP22: &str = r#"RSPDefinitions DEFINITIONS AUTOMATIC TAGS EXTENSIBILITY IMPLIED ::=
+    include_str!("../examples/sgp22.asn").to_string()
+}
+
+/// A minimal schema, for a quick first look.
+#[wasm_bindgen]
+pub fn example_minimal() -> String {
+    r#"Simple DEFINITIONS AUTOMATIC TAGS ::=
 BEGIN
 
--- A valid subset of SGP.22 v3.1 Annex H (Remote SIM Provisioning).
--- SGP.22 splits this module across 98 blocks in the PDF; this is the
--- part that matters for profile metadata.
-
-Octet8  ::= OCTET STRING (SIZE(8))
-Octet16 ::= OCTET STRING (SIZE(16))
-OctetTo16 ::= OCTET STRING (SIZE(1..16))
-Octet32 ::= OCTET STRING (SIZE(32))
-
-VersionType ::= OCTET STRING (SIZE(3))
-
--- ICCID as coded in EFiccid; corresponding tag is '5A'
-Iccid ::= [APPLICATION 26] OCTET STRING (SIZE(10))
-
-TransactionId ::= OCTET STRING (SIZE(1..16))
-
--- SGP.22 5.7.2. mccMnc is an OCTET STRING of 3, coded as 3GPP TS 24.008.
--- The ASN.1 says nothing about the internal layout: that is the
--- 3GPP spec's business, which is why a schema compiler alone will
--- not decode it for you.
-OperatorId ::= SEQUENCE {
-   mccMnc OCTET STRING (SIZE(3)),
-   gid1   OCTET STRING OPTIONAL,
-   gid2   OCTET STRING OPTIONAL
+Record ::= SEQUENCE {
+   id      INTEGER (0..65535),
+   active  BOOLEAN,
+   label   UTF8String (SIZE(1..32)) OPTIONAL,
+   tags    SEQUENCE OF UTF8String
 }
 
--- Profile metadata: the ProfileOwner carries mccMnc, which must match
--- the MCC/MNC in EF-IMSI (SGP.22 5.7.2).
-StoreMetadataRequest ::= SEQUENCE {
-   iccid           Iccid,
-   serviceProviderName UTF8String (SIZE(1..32)),
-   iccids          SEQUENCE OF Iccid,
-   profileOwner    OperatorId OPTIONAL,
-   profileName     UTF8String (SIZE(1..64)) OPTIONAL
-}
-
--- ES9+ authenticateServer, abbreviated
-AuthenticateServerRequest ::= SEQUENCE {
-   serverSigned1   OCTET STRING,
-   serverSignature1 OCTET STRING,
-   euiccCiPKIdToBeUsed SubjectKeyIdentifier,
-   serverCertificate OCTET STRING,
-   ctxParams1      OCTET STRING
-}
-
-SubjectKeyIdentifier ::= OCTET STRING
 END
-"#;
-    SGP22.to_string()
+"#
+    .to_string()
 }

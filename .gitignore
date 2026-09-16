@@ -11,3 +11,7 @@ crate/target
 #   cd crate && wasm-pack build --target web --release --out-dir ../web/pkg
 !web/pkg/
 !web/pkg/**
+
+# Python bytecode from scripts/
+__pycache__/
+*.pyc

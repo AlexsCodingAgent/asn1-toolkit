@@ -1,0 +1,397 @@
+SGP22v31Test DEFINITIONS AUTOMATIC TAGS ::=
+BEGIN
+
+-- Extracted from SGP.22-v3.1.txt by scripts/extract_spec_asn1.py.
+-- Only type assignments that could be read with certainty are kept.
+-- Prose, IMPORTS and value assignments are omitted; the count below is
+-- therefore a floor on this spec's ASN.1 surface, not a total.
+
+Octet1 ::= OCTET STRING(SIZE(1))
+
+Octet4 ::= OCTET STRING (SIZE(4))
+
+Octet8 ::= OCTET STRING (SIZE(8))
+
+Octet16 ::= OCTET STRING (SIZE(16))
+
+OctetTo16 ::= OCTET STRING (SIZE(1..16))
+
+Octet32 ::= OCTET STRING (SIZE(32))
+
+VersionType ::= OCTET STRING(SIZE(3))
+
+Iccid ::= [APPLICATION 26] OCTET STRING (SIZE(10))
+
+RemoteOpId ::= [2] INTEGER {installBoundProfilePackage(1)}
+
+TransactionId ::= OCTET STRING (SIZE(1..16))
+
+PermittedEins ::= SEQUENCE OF PrintableString
+
+PprIds ::= BIT STRING { pprUpdateControl(0) }
+
+OperatorId ::= SEQUENCE { mccMnc OCTET STRING (SIZE(3)), gid1 OCTET STRING OPTIONAL, gid2 OCTET STRING OPTIONAL }
+
+RpmConfiguration ::= SEQUENCE { managingDpList [0] SEQUENCE OF SEQUENCE { managingDpOid [0] OBJECT IDENTIFIER, rpmType [1] RpmType OPTIONAL, tagList [APPLICATION 28] OCTET STRING OPTIONAL }, pollingAddress [1] UTF8String OPTIONAL, allowedCiPKId [2] SubjectKeyIdentifier OPTIONAL, profileOwnerOid [3] OBJECT IDENTIFIER }
+
+RpmType ::= BIT STRING{}
+
+LocalisedTextMessage ::= SEQUENCE { languageTag UTF8String DEFAULT "en", message UTF8String }
+
+LprConfiguration ::= SEQUENCE { pcmpAddress [0] UTF8String, dpiEnable [1] UTF8String OPTIONAL, triggerLprOnEnableProfile [2] NULL OPTIONAL }
+
+CertificateChain ::= SEQUENCE OF Certificate
+
+EnterpriseConfiguration ::= SEQUENCE { enterpriseOid [0] OBJECT IDENTIFIER, enterpriseName [1] UTF8String (SIZE(0..64)), enterpriseRules [2] SEQUENCE { enterpriseRuleBits [0] BIT STRING { referenceEnterpriseRule (0), priorityEnterpriseProfile (1), onlyEnterpriseProfilesCanBeInstalled (2) }, numberOfNonEnterpriseProfiles [1] INTEGER } OPTIONAL }
+
+OPENTYPE ::= CLASS { &typeId OBJECT IDENTIFIER, &Type }
+
+VendorSpecificExtension ::= SEQUENCE OF SEQUENCE { vendorOid [0] OPENTYPE.&typeId, extension vendorSpecificData [1] OPENTYPE.&Type }
+
+DeviceChangeConfiguration ::= CHOICE { requestToDp [0] SEQUENCE { smdpAddressForDc UTF8String, Change allowedCiPKId SubjectKeyIdentifier OPTIONAL, eidRequired NULL OPTIONAL, tacRequired NULL OPTIONAL }, usingStoredAc [1] SEQUENCE { activationCodeForDc UTF8String (SIZE(0..255)), Change of this Profile deleteOldProfile NULL OPTIONAL } }
+
+BoundProfilePackage ::= [54] SEQUENCE { initialiseSecureChannelRequest [35] InitialiseSecureChannelRequest, firstSequenceOf87 [0] SEQUENCE OF [7] OCTET STRING, sequenceOf88 [1] SEQUENCE OF [8] OCTET STRING, secondSequenceOf87 [2] SEQUENCE OF [7] OCTET STRING OPTIONAL, sequenceOf86 [3] SEQUENCE OF [6] OCTET STRING }
+
+ProfileInstallationResult ::= [55] SEQUENCE { profileInstallationResultData [39] ProfileInstallationResultData, euiccSignPIR EuiccSign }
+
+ProfileInstallationResultData ::= [39] SEQUENCE { transactionId[0] TransactionId, notificationMetadata[47] NotificationMetadata, smdpOid OBJECT IDENTIFIER, finalResult [2] CHOICE { successResult SuccessResult, errorResult ErrorResult } }
+
+EuiccSign ::= [APPLICATION 55] OCTET STRING
+
+SuccessResult ::= SEQUENCE { aid [APPLICATION 15] OCTET STRING (SIZE (5..16)), ppiResponse OCTET STRING Package Interpreter as defined in [5] }
+
+ErrorResult ::= SEQUENCE { bppCommandId BppCommandId, errorReason ErrorReason, ppiResponse OCTET STRING OPTIONAL Profile Package Interpreter as defined in [5] }
+
+BppCommandId ::= INTEGER { initialiseSecureChannel(0), configureISDP(1), storeMetadata(2), storeMetadata2(3), replaceSessionKeys(4), loadProfileElements(5) }
+
+ErrorReason ::= INTEGER { incorrectInputValues(1), invalidSignature(2), invalidTransactionId(3), unsupportedCrtValues(4), unsupportedRemoteOperationType(5), unsupportedProfileClass(6), bspStructureError(7), bspSecurityError(8), installFailedDueToIccidAlreadyExistsOnEuicc(9), installFailedDueToInsufficientMemoryForProfile(10), installFailedDueToInterruption(11), installFailedDueToPEProcessingError (12), installFailedDueToDataMismatch(13), testProfileInstallFailedDueToInvalidNaaKey(14), pprNotAllowed(15), enterpriseProfilesNotSupported(17), enterpriseRulesNotAllowed(18), enterpriseProfileNotAllowed(19), enterpriseOidMismatch(20), enterpriseRulesError(21), enterpriseProfilesOnly(22), lprNotSupported(23), unknownTlvInMetadata(26), installFailedDueToUnknownError(127) }
+
+RpmPackage ::= SEQUENCE OF RpmCommand
+
+RpmCommand ::= SEQUENCE { continueOnFailure [0] NULL OPTIONAL, rpmCommandDetails CHOICE { enable [1] SEQUENCE {iccid [APPLICATION 26] Iccid}, disable [2] SEQUENCE {iccid [APPLICATION 26] Iccid}, delete [3] SEQUENCE {iccid [APPLICATION 26] Iccid}, listProfileInfo [4] ListProfileInfo, updateMetadata [5] SEQUENCE { iccid [APPLICATION 26] Iccid, updateMetadataRequest UpdateMetadataRequest }, contactPcmp [6] SEQUENCE { iccid [APPLICATION 26] Iccid, dpiRpm UTF8String OPTIONAL } } }
+
+LoadRpmPackageResult ::= [68] CHOICE { loadRpmPackageResultSigned LoadRpmPackageResultSigned, loadRpmPackageResultNotSigned LoadRpmPackageResultNotSigned }
+
+LoadRpmPackageResultSigned ::= SEQUENCE { loadRpmPackageResultDataSigned LoadRpmPackageResultDataSigned, euiccSignRPR EuiccSign }
+
+LoadRpmPackageResultDataSigned ::= SEQUENCE { transactionId [0] TransactionId, notificationMetadata[47] NotificationMetadata, smdpOid OBJECT IDENTIFIER, finalResult [2] CHOICE { rpmPackageExecutionResult SEQUENCE OF RpmCommandResult, loadRpmPackageErrorCodeSigned LoadRpmPackageErrorCodeSigned } }
+
+RpmCommandResult ::= SEQUENCE { iccid [APPLICATION 26] Iccid OPTIONAL, listProfileInfoResult and rpmProcessingTerminated rpmCommandResultData CHOICE { enableResult [49] EnableProfileResponse, disableResult [50] DisableProfileResponse, deleteResult [51] DeleteProfileResponse, listProfileInfoResult [45] ProfileInfoListResponse, updateMetadataResult [42] UpdateMetadataResponse, contactPcmpResult [0] ContactPcmpResponse, rpmProcessingTerminated INTEGER { resultSizeOverflow (1), unknownOrDamagedCommand (2), commandsWithRefreshExceeded (4), commandAfterContactPcmp (5), commandPackageTooLarge (6) } } }
+
+ContactPcmpResponse ::= CHOICE { contactPcmpResponseOk SEQUENCE { pcmpAddress UTF8String }, contactPcmpResponseError INTEGER { profileNotEnabled(2), commandError(7), noLprConfiguration(13), undefinedError(127)} }
+
+LoadRpmPackageResultNotSigned ::= SEQUENCE { transactionId [0] TransactionId, loadRpmPackageErrorCodeNotSigned LoadRpmPackageErrorCodeNotSigned }
+
+LoadRpmPackageErrorCodeSigned ::= INTEGER { invalidSignature(2), invalidTransactionId(5), undefinedError(127)}
+
+LoadRpmPackageErrorCodeNotSigned ::= INTEGER { noSession(4), undefinedError(127)}
+
+DeleteNotificationForDc ::= [99] SEQUENCE { notificationMetadata NotificationMetadata, euiccNotificationSignature EuiccSign }
+
+DeviceInfo ::= SEQUENCE { tac Octet4, deviceCapabilities DeviceCapabilities, imei Octet8 OPTIONAL, preferredLanguages SEQUENCE OF UTF8String OPTIONAL, deviceTestMode NULL OPTIONAL, the Device is operating in Device Test Mode lpaRspCapability LpaRspCapability OPTIONAL Tag '85' }
+
+DeviceCapabilities ::= SEQUENCE { definition gsmSupportedRelease VersionType OPTIONAL, utranSupportedRelease VersionType OPTIONAL, cdma2000onexSupportedRelease VersionType OPTIONAL, cdma2000hrpdSupportedRelease VersionType OPTIONAL, cdma2000ehrpdSupportedRelease VersionType OPTIONAL, eutranEpcSupportedRelease VersionType OPTIONAL, contactlessSupportedRelease VersionType OPTIONAL, rspCrlSupportedVersion VersionType OPTIONAL, nrEpcSupportedRelease VersionType OPTIONAL, nr5gcSupportedRelease VersionType OPTIONAL, eutran5gcSupportedRelease VersionType OPTIONAL, lpaSvn VersionType OPTIONAL, catSupportedClasses CatSupportedClasses OPTIONAL, SGP.22 RSP Technical Specification euiccFormFactorType EuiccFormFactorType OPTIONAL, deviceAdditionalFeatureSupport DeviceAdditionalFeatureSupport OPTIONAL }
+
+CatSupportedClasses ::= BIT STRING {}
+
+EuiccFormFactorType ::= INTEGER { removableEuicc (0), nonRemovableEuicc (1) }
+
+DeviceAdditionalFeatureSupport ::= SEQUENCE { naiSupport VersionType OPTIONAL }
+
+LpaRspCapability ::= BIT STRING { crlStaplingV3Support (0), certChainV3Support (1), apduApiSupport (2), enterpriseCapableDevice (3), lpaProxySupport (4), signedSmdsResponseV3Support (5), euiccCiUpdateSupport (6), eventCheckingSupport (7), pushServiceSupport (8), pendingOperationAlertingSupport (9) }
+
+EUICCInfo1 ::= [32] SEQUENCE { lowestSvn [2] VersionType, euiccCiPKIdListForVerification [9] SEQUENCE OF SubjectKeyIdentifier, eSIM CA RootCA Public Key Identifiers supported on the eUICC for signature verification euiccCiPKIdListForSigning [10] SEQUENCE OF SubjectKeyIdentifier, CA RootCA Public Key Identifier supported on the eUICC for signature creation that euiccCiPKIdListForSigningV3 [17] SEQUENCE OF SubjectKeyIdentifier OPTIONAL, List of eSIM CA RootCA Public Key Identifiers supported on euiccRspCapability [8] EuiccRspCapability OPTIONAL, highestSvn [19] VersionType OPTIONAL }
+
+EUICCInfo2 ::= [34] SEQUENCE { baseProfilePackageVersion [1] VersionType, lowestSvn [2] VersionType, euiccFirmwareVersion [3] VersionType, extCardResource [4] OCTET STRING, uiccCapability [5] UICCCapability, ts102241Version [6] VersionType OPTIONAL, globalplatformVersion [7] VersionType OPTIONAL, euiccRspCapability [8] EuiccRspCapability, euiccCiPKIdListForVerification [9] SEQUENCE OF SubjectKeyIdentifier, eSIM CA RootCA Public Key Identifiers supported on the eUICC for signature verification euiccCiPKIdListForSigning [10] SEQUENCE OF SubjectKeyIdentifier, CA RootCA Public Key Identifier supported on the eUICC for signature creation that euiccCategory [11] INTEGER { basicEuicc(1), mediumEuicc(2), contactlessEuicc(3) } OPTIONAL, forbiddenProfilePolicyRules [25] PprIds OPTIONAL, ppVersion VersionType, sasAcreditationNumber UTF8String (SIZE(0..64)), certificationDataObject [12] CertificationDataObject OPTIONAL, treProperties [13] BIT STRING { isDiscrete(0), isIntegrated(1), usesRemoteMemory(2) } OPTIONAL, SGP.22 RSP Technical Specification treProductReference [14] UTF8String OPTIONAL, GlobalPlatform DLOA specification [57] additionalProfilePackageVersions [15] SEQUENCE OF VersionType OPTIONAL, lpaMode [16] LpaMode OPTIONAL, euiccCiPKIdListForSigningV3 [17] SEQUENCE OF SubjectKeyIdentifier OPTIONAL, List of eSIM CA RootCA Public Key Identifiers supported on additionalEuiccInfo [18] OCTET STRING (SIZE(0..32)) OPTIONAL, EUM specific eUICC information highestSvn [19] VersionType OPTIONAL, iotSpecificInfo [20] IoTSpecificInfo OPTIONAL }
+
+EuiccRspCapability ::= BIT STRING { additionalProfile(0), loadCrlSupport(1), rpmSupport(2), testProfileSupport (3), deviceInfoExtensibilitySupport (4), serviceSpecificDataSupport (5), Specific Data in the Profile Metadata hriServerAddressSupport (6), serviceProviderMessageSupport (7), lpaProxySupport (8), enterpriseProfilesSupport (9), serviceDescriptionSupport (10), Service Description deviceChangeSupport (11), encryptedDeviceChangeDataSupport (12), encrypted Device Change data in Device Change response estimatedProfileSizeIndicationSupport (13), profileSizeInProfilesInfoSupport (14), crlStaplingV3Support (15), certChainV3VerificationSupport (16), signedSmdsResponseV3Support (17), euiccRspCapInInfo1 (18), euiccRspCapability osUpdateSupport (19), cancelForEmptySpnPnSupport (20), updateNotifConfigInfoSupport (21), NotificationConfigurationInfo as defined in section 5.4.1 updateMetadataV3Support (22), v3ObjectsInCtxParamsCASupport (23), pushServiceRegistrationSupport (24) for CtxParamsForPushServiceRegistration }
+
+CertificationDataObject ::= SEQUENCE { platformLabel UTF8String, DLOA specification [57] discoveryBaseURL UTF8String Registrar as defined in GlobalPlatform DLOA specification [57] }
+
+LpaMode ::= INTEGER {}
+
+IoTSpecificInfo ::= SEQUENCE {}
+
+UpdateMetadataRequest ::= [42] SEQUENCE { serviceProviderName [17] UTF8String (SIZE(0..32)) OPTIONAL, profileName [18] UTF8String (SIZE(0..64)) OPTIONAL, iconType [19] IconType OPTIONAL, icon [20] OCTET STRING (SIZE(0..1024)) OPTIONAL, profilePolicyRules [25] PprIds OPTIONAL, serviceSpecificDataStoredInEuicc [34] VendorSpecificExtension OPTIONAL, Tag 'BF22' notificationConfigurationInfo [22] SEQUENCE OF NotificationConfigurationInformation OPTIONAL, tagsForDeletion [APPLICATION 28] OCTET STRING OPTIONAL, tag '5C' rpmConfiguration [26] RpmConfiguration OPTIONAL, hriServerAddress [27] UTF8String OPTIONAL, lprConfiguration [28] LprConfiguration OPTIONAL, Tag 'BC' enterpriseConfiguration [29] EnterpriseConfiguration OPTIONAL, Tag 'BD' deviceChangeConfiguration [32] DeviceChangeConfiguration OPTIONAL Tag 'BF20' }
+
+UpdateMetadataResponse ::= [42] INTEGER { enterpriseConfigurationNotAllowed (6), commandError (7), pprUpdateInvalidSetting (12), invalidRpmConfiguration (14), deleteNotAllowed (15), undefinedError(127) }
+
+InitialiseSecureChannelRequest ::= [35] SEQUENCE { remoteOpId RemoteOpId, transactionId [0] TransactionId, controlRefTemplate[6] IMPLICIT ControlRefTemplate, (Key Agreement). Current specification considers a subset of CRT specified in GlobalPlatform Card Specification Amendment F [13] section 6.5.2.3 for the Mutual Authentication Data Field smdpOtpk [APPLICATION 73] OCTET STRING, GlobalPlatform Card Specification Amendment F [13] section 6.5.2.3 for ePK.OCE.KA, smdpSign [APPLICATION 55] OCTET STRING }
+
+ControlRefTemplate ::= SEQUENCE { keyType[0] Octet1, [8] Table 11-16, Tag '80' keyLen[1] Octet1, hostId[4] OctetTo16 }
+
+ConfigureISDPRequest ::= [36] SEQUENCE { dpProprietaryData [24] DpProprietaryData OPTIONAL }
+
+DpProprietaryData ::= SEQUENCE { 128 bytes dpOid OBJECT IDENTIFIER }
+
+NotificationEvent ::= BIT STRING { notificationInstall(0), notificationLocalEnable(1), notificationLocalDisable(2), notificationLocalDelete(3), notificationRpmEnable(4), notificationRpmDisable(5), notificationRpmDelete(6), loadRpmPackageResult(7) }
+
+NotificationConfigurationInformation ::= SEQUENCE { profileManagementOperation NotificationEvent, notificationAddress UTF8String }
+
+ServiceDescription ::= BIT STRING {}
+
+ISDRProprietaryApplicationTemplate ::= [PRIVATE 0] SEQUENCE { lowestSvn [2] VersionType, euiccConfiguration BIT STRING { lpaeUsingCatSupported(0), lpaeUsingScwsSupported(1), enabledProfile(2), lpaeUsingE4Esupported(3) } OPTIONAL }
+
+LpaeActivationRequest ::= [66] SEQUENCE { lpaeOption BIT STRING { activateCatBasedLpae(0), SGP.22 RSP Technical Specification activateScwsBasedLpae(1) } }
+
+LpaeActivationResponse ::= [66] SEQUENCE { lpaeActivationResult INTEGER {ok(0), notSupported(1)} }
+
+EuiccConfiguredDataRequest ::= [60] SEQUENCE {}
+
+EuiccConfiguredDataResponse ::= [60] SEQUENCE { defaultDpAddress UTF8String OPTIONAL, rootDsAddress UTF8String, additionalRootDsAddresses SEQUENCE OF UTF8String OPTIONAL, allowedCiPKId SubjectKeyIdentifier OPTIONAL, ciList SEQUENCE OF SEQUENCE { ciPKId SubjectKeyIdentifier, supported ciName UTF8String } OPTIONAL }
+
+SetDefaultDpAddressRequest ::= [63] SEQUENCE { defaultDpAddress UTF8String, allowedCiPKId SubjectKeyIdentifier OPTIONAL }
+
+SetDefaultDpAddressResponse ::= [63] SEQUENCE { setDefaultDpAddressResult INTEGER { unsupportedCiPKId(8), undefinedError (127)} }
+
+PrepareDownloadRequest ::= [33] SEQUENCE { smdpSigned2 SmdpSigned2, smdpSignature2 [APPLICATION 55] OCTET STRING, hashCc Octet32 OPTIONAL, smdpCertificate Certificate }
+
+SmdpSigned2 ::= SEQUENCE { transactionId [0] TransactionId, SM-DP+ ccRequiredFlag BOOLEAN, SGP.22 RSP Technical Specification bppEuiccOtpk [APPLICATION 73] OCTET STRING OPTIONAL, rpmPending NULL OPTIONAL }
+
+PrepareDownloadResponse ::= [33] CHOICE { downloadResponseOk PrepareDownloadResponseOk, downloadResponseError PrepareDownloadResponseError }
+
+PrepareDownloadResponseOk ::= SEQUENCE { euiccSigned2 EUICCSigned2, euiccSignature2 [APPLICATION 55] OCTET STRING }
+
+EUICCSigned2 ::= SEQUENCE { transactionId [0] TransactionId, euiccOtpk [APPLICATION 73] OCTET STRING, hashCc Octet32 OPTIONAL, additionalInformation VendorSpecificExtension OPTIONAL }
+
+PrepareDownloadResponseError ::= SEQUENCE { transactionId [0] TransactionId, downloadErrorCode DownloadErrorCode }
+
+DownloadErrorCode ::= INTEGER {invalidCertificate(1), invalidSignature(2), unsupportedCurve(3), noSession(4), invalidTransactionId(5), undefinedError(127)}
+
+GetEuiccChallengeRequest ::= [46] SEQUENCE {}
+
+GetEuiccChallengeResponse ::= [46] SEQUENCE { euiccChallenge Octet16 }
+
+GetEuiccInfo1Request ::= [32] SEQUENCE {}
+
+GetEuiccInfo2Request ::= [34] SEQUENCE {}
+
+ListNotificationRequest ::= [40] SEQUENCE { profileManagementOperation [1] NotificationEvent OPTIONAL }
+
+ListNotificationResponse ::= [40] CHOICE { notificationMetadataList SEQUENCE OF NotificationMetadata, listNotificationsResultError INTEGER {undefinedError(127)} }
+
+NotificationMetadata ::= [47] SEQUENCE { seqNumber [0] INTEGER, profileManagementOperation [1] NotificationEvent, notificationAddress UTF8String, iccid Iccid OPTIONAL }
+
+RetrieveNotificationsListRequest ::= [43] SEQUENCE { searchCriteria CHOICE { seqNumber [0] INTEGER, profileManagementOperation [1] NotificationEvent } OPTIONAL }
+
+RetrieveNotificationsListResponse ::= [43] CHOICE { notificationList SEQUENCE OF PendingNotification, notificationsListResultError INTEGER { undefinedError(127)} }
+
+PendingNotification ::= CHOICE { profileInstallationResult [55] ProfileInstallationResult, otherSignedNotification OtherSignedNotification, loadRpmPackageResultSigned [1] LoadRpmPackageResultSigned }
+
+OtherSignedNotification ::= SEQUENCE { tbsOtherNotification NotificationMetadata, euiccNotificationSignature EuiccSign, euiccCertificate Certificate, SGP.22 RSP Technical Specification nextCertInChain Certificate, otherCertsInChain [1] CertificateChain OPTIONAL Certificates in the eUICC certificate chain, if any }
+
+NotificationSentRequest ::= [48] SEQUENCE { seqNumber [0] INTEGER }
+
+NotificationSentResponse ::= [48] SEQUENCE { deleteNotificationStatus INTEGER {ok(0), nothingToDelete(1), undefinedError(127)} }
+
+AuthenticateServerRequest ::= [56] SEQUENCE { serverSigned1 ServerSigned1, serverSignature1 [APPLICATION 55] OCTET STRING, euiccCiPKIdToBeUsed SubjectKeyIdentifier OPTIONAL, Identifier to be used; MAY also have zero length serverCertificate Certificate, ctxParams1 CtxParams1, otherCertsInChain [1] CertificateChain OPTIONAL, crlList [2] SEQUENCE OF CertificateList OPTIONAL }
+
+ServerSigned1 ::= SEQUENCE { transactionId [0] TransactionId, the RSP Server euiccChallenge [1] Octet16, serverAddress [3] UTF8String, serverChallenge [4] Octet16, sessionContext [5] SessionContext OPTIONAL, serverRspCapability [6] ServerRspCapability OPTIONAL }
+
+CtxParams1 ::= CHOICE { ctxParamsForCommonAuthentication[0] CtxParamsForCommonAuthentication, ctxParamsForDeviceChange [1] CtxParamsForDeviceChange, ctxParamsForProfileRecovery [2] CtxParamsForProfileRecovery, ctxParamsForPushServiceRegistration [3] CtxParamsForPushServiceRegistration }
+
+CtxParamsForCommonAuthentication ::= SEQUENCE { matchingId [0] UTF8String OPTIONAL, deviceInfo [1] DeviceInfo, operationType [2] OperationType DEFAULT {profileDownload}, iccid Iccid OPTIONAL, matchingIdSource [3] MatchingIdSource OPTIONAL, vendorSpecificExtension [4] VendorSpecificExtension OPTIONAL }
+
+CtxParamsForDeviceChange ::= SEQUENCE { iccid Iccid, deviceInfo [1] DeviceInfo, SGP.22 RSP Technical Specification targetEidValue [APPLICATION 26] Octet16 OPTIONAL, targetTacValue [2] Octet4 OPTIONAL, vendorSpecificExtension [3] VendorSpecificExtension OPTIONAL }
+
+CtxParamsForProfileRecovery ::= SEQUENCE { iccid Iccid, deviceInfo [1] DeviceInfo, vendorSpecificExtension [2] VendorSpecificExtension OPTIONAL }
+
+CtxParamsForPushServiceRegistration ::= SEQUENCE { selectedPushService [0] OBJECT IDENTIFIER, pushToken [1] UTF8String }
+
+MatchingIdSource ::= CHOICE { none [0] NULL, activationCode [1] NULL, smdsOid [2] OBJECT IDENTIFIER }
+
+OperationType ::= BIT STRING { profileDownload(0) }
+
+SessionContext ::= SEQUENCE { serverSvn [0] VersionType, crlStaplingV3Used [1] BOOLEAN, response euiccCiPKIdToBeUsedV3 [2] SubjectKeyIdentifier OPTIONAL, supportedPushServices [3] SEQUENCE OF OBJECT IDENTIFIER OPTIONAL }
+
+ServerRspCapability ::= BIT STRING { crlStaplingV3Support (0), eventListSigningV3Support (1), pushServiceV3Support (2), cancelForEmptySpnPnSupport (3), cancelForSessionAbortedSupport (4) }
+
+AuthenticateServerResponse ::= [56] CHOICE { authenticateResponseOk [0] AuthenticateResponseOk, authenticateResponseError [1] AuthenticateResponseError }
+
+AuthenticateResponseOk ::= SEQUENCE { euiccSigned1 EuiccSigned1, euiccSignature1 [APPLICATION 55] OCTET STRING, euiccCertificate Certificate, nextCertInChain Certificate, Certificate otherCertsInChain [0] CertificateChain OPTIONAL Certificates in the eUICC certificate chain, if any }
+
+EuiccSigned1 ::= SEQUENCE { transactionId [0] TransactionId, serverAddress [3] UTF8String, SGP.22 RSP Technical Specification serverChallenge [4] Octet16, euiccInfo2 [34] EUICCInfo2, ctxParams1 CtxParams1 }
+
+AuthenticateResponseError ::= SEQUENCE { transactionId [0] TransactionId, authenticateErrorCode AuthenticateErrorCode }
+
+AuthenticateErrorCode ::= INTEGER {invalidCertificate(1), invalidSignature(2), unsupportedCurve(3), noSession(4), invalidOid(5), euiccChallengeMismatch(6), ciPKUnknown(7), transactionIdError (8), missingCrl(9), invalidCrlSignature(10), revokedCert(11), invalidCertOrCrlTime(12), invalidCertOrCrlConfiguration(13), invalidIccid(14), undefinedError(127)}
+
+CancelSessionRequest ::= [65] SEQUENCE { transactionId TransactionId, reason CancelSessionReason }
+
+CancelSessionReason ::= INTEGER { endUserRejection(0), pprNotAllowed(3), metadataMismatch(4), loadBppExecutionError(5), sessionAborted(16), enterpriseProfilesNotSupported(17), enterpriseRulesNotAllowed(18), enterpriseProfileNotAllowed(19), enterpriseOidMismatch(20), enterpriseRulesError(21), enterpriseProfilesOnly(22), lprNotSupported(23), lprNetworkDataNotAllowed(24), emptyProfileOrSpName(25), rpmDisabled(27), invalidRpmPackage(28), loadRpmPackageError(29), operationAbandoned (30), undefinedReason(127) }
+
+CancelSessionResponse ::= [65] CHOICE { cancelSessionResponseOk CancelSessionResponseOk, cancelSessionResponseError INTEGER {invalidTransactionId(5), undefinedError(127)} }
+
+CancelSessionResponseOk ::= SEQUENCE { euiccCancelSessionSigned EuiccCancelSessionSigned, euiccCancelSessionSignature [APPLICATION 55] OCTET STRING }
+
+EuiccCancelSessionSigned ::= SEQUENCE { transactionId TransactionId, smdpOid OBJECT IDENTIFIER, reason CancelSessionReason }
+
+ProfileInfoListRequest ::= [45] SEQUENCE { searchCriteria [0] CHOICE { isdpAid [APPLICATION 15] OctetTo16, iccid Iccid, profileClass [21] ProfileClass } OPTIONAL, tagList [APPLICATION 28] OCTET STRING OPTIONAL }
+
+ListProfileInfo ::= [5] SEQUENCE { searchCriteria [0] CHOICE { iccid Iccid, profileOwnerOid [0] OBJECT IDENTIFIER }, tagList [APPLICATION 28] OCTET STRING OPTIONAL }
+
+ProfileInfoListResponse ::= [45] CHOICE { profileInfoListOk SEQUENCE OF ProfileInfo, profileInfoListError ProfileInfoListError }
+
+ProfileInfo ::= [PRIVATE 3] SEQUENCE { iccid Iccid OPTIONAL, isdpAid [APPLICATION 15] OctetTo16 OPTIONAL, Profile, tag '4F' profileState [112] ProfileState OPTIONAL, profileNickname [16] UTF8String (SIZE(0..64)) OPTIONAL, serviceProviderName [17] UTF8String (SIZE(0..32)) OPTIONAL, profileName [18] UTF8String (SIZE(0..64)) OPTIONAL, iconType [19] IconType OPTIONAL, icon [20] OCTET STRING (SIZE(0..1024)) OPTIONAL, profileClass [21] ProfileClass OPTIONAL, notificationConfigurationInfo [22] SEQUENCE OF NotificationConfigurationInformation OPTIONAL, profileOwner [23] OperatorId OPTIONAL, dpProprietaryData [24] DpProprietaryData OPTIONAL, profilePolicyRules [25] PprIds OPTIONAL, serviceSpecificDataStoredInEuicc [34] VendorSpecificExtension OPTIONAL, Tag 'BF22' rpmConfiguration [26] RpmConfiguration OPTIONAL, hriServerAddress [27] UTF8String OPTIONAL, lprConfiguration [28] LprConfiguration OPTIONAL, Tag 'BC' enterpriseConfiguration [29] EnterpriseConfiguration OPTIONAL, serviceDescription [31] ServiceDescription OPTIONAL, Tag '9F1F' deviceChangeConfiguration [32] DeviceChangeConfiguration OPTIONAL, Tag 'BF20' enabledOnEsimPort [36] INTEGER OPTIONAL, profileSize [37] INTEGER OPTIONAL }
+
+IconType ::= INTEGER {jpg(0), png(1)}
+
+ProfileState ::= INTEGER {disabled(0), enabled(1)}
+
+ProfileClass ::= INTEGER {test(0), provisioning(1), operational(2)}
+
+ProfileInfoListError ::= INTEGER { incorrectInputValues(1), profileChangeOngoing (11), undefinedError(127) }
+
+EnableProfileRequest ::= [49] SEQUENCE { profileIdentifier CHOICE { isdpAid [APPLICATION 15] OctetTo16, iccid Iccid }, refreshFlag BOOLEAN, targetEsimPort INTEGER OPTIONAL }
+
+EnableProfileResponse ::= [49] SEQUENCE { enableResult INTEGER { iccidOrAidNotFound(1), profileNotInDisabledState(2), disallowedByPolicy(3), wrongProfileReenabling(4), catBusy(5), disallowedByEnterpriseRule(6), SGP.22 RSP Technical Specification commandError(7), disallowedForRpm(9), noEsimPortAvailable(10), undefinedError(127) }, targetEsimPort INTEGER OPTIONAL }
+
+DisableProfileRequest ::= [50] SEQUENCE { profileIdentifier CHOICE { isdpAid [APPLICATION 15] OctetTo16, iccid Iccid }, refreshFlag BOOLEAN }
+
+DisableProfileResponse ::= [50] SEQUENCE { disableResult INTEGER { iccidOrAidNotFound(1), profileNotInEnabledState(2), disallowedByPolicy(3), catBusy(5), disallowedByEnterpriseRule(6), commandError(7), disallowedForRpm(9), undefinedError(127) } }
+
+DeleteProfileRequest ::= [51] CHOICE { SGP.22 RSP Technical Specification isdpAid [APPLICATION 15] OctetTo16, iccid Iccid }
+
+DeleteProfileResponse ::= [51] SEQUENCE { deleteResult INTEGER { iccidOrAidNotFound(1), profileNotInDisabledState(2), disallowedByPolicy(3), disallowedInTestMode(4), commandError(7), undefinedError(127) } }
+
+EuiccMemoryResetRequest ::= [52] SEQUENCE { resetOptions [2] BIT STRING { deleteOperationalProfiles(0), deleteFieldLoadedTestProfiles(1), resetDefaultSmdpAddress(2), deletePreLoadedTestProfiles(3), deleteProvisioningProfiles(4)} }
+
+EuiccMemoryResetResponse ::= [52] SEQUENCE { resetResult INTEGER {ok(0), nothingToDelete(1), catBusy(5), undefinedError(127)} }
+
+GetEuiccDataRequest ::= [62] SEQUENCE { tagList [APPLICATION 28] Octet1 SGP.22 RSP Technical Specification }
+
+GetEuiccDataResponse ::= [62] SEQUENCE { eidValue [APPLICATION 26] Octet16 }
+
+SetNicknameRequest ::= [41] SEQUENCE { iccid Iccid, profileNickname [16] UTF8String (SIZE(0..64)) }
+
+SetNicknameResponse ::= [41] SEQUENCE { setNicknameResult INTEGER {ok(0), iccidNotFound (1), undefinedError(127)} }
+
+GetRatRequest ::= [67] SEQUENCE {}
+
+GetRatResponse ::= [67] SEQUENCE { rat RulesAuthorisationTable }
+
+RulesAuthorisationTable ::= SEQUENCE OF ProfilePolicyAuthorisationRule
+
+ProfilePolicyAuthorisationRule ::= SEQUENCE { pprIds PprIds, allowedOperators SEQUENCE OF OperatorId, pprFlags BIT STRING {consentRequired(0)} }
+
+AlertData ::= [74] CHOICE { metadataUpdateEnabledProfile [0] MetadataUpdateEnabledProfile, pendingOperationAlert [1] ServerWithPendingOperation }
+
+MetadataUpdateEnabledProfile ::= SEQUENCE { iccid Iccid OPTIONAL, tagList [APPLICATION 28] OCTET STRING }
+
+ServerWithPendingOperation ::= CHOICE { pollingAddress [0] NULL, rootSmds [1] NULL, defaultSmdp [2] NULL, explicitAddress [3] UTF8String }
+
+VerifySmdsResponseRequest ::= [69] SEQUENCE { smdsSigned2 SmdsSigned2, smdsSignature2 [APPLICATION 55] OCTET STRING }
+
+SmdsSigned2 ::= SEQUENCE { transactionId [0] TransactionId, requestSpecificData CHOICE { eventList [0] SEQUENCE { eventEntries [1] SEQUENCE OF EventRecordV3, ecId [2] OCTET STRING(SIZE(16..32)) OPTIONAL, Event Checking ID pushServiceRefreshTime [3] GeneralizedTime OPTIONAL date and time to re-register a Push Token to the SM-DS }, SGP.22 RSP Technical Specification pushServiceRegistrationResult [1] SEQUENCE { pushServiceRefreshTime [3] GeneralizedTime OPTIONAL date and time to re-register a Push Token to the SM-DS } } }
+
+EventRecordV3 ::= SEQUENCE { eventId UTF8String, rspServerAddress UTF8String, eventType INTEGER, hashedIccids SEQUENCE OF OCTET STRING (SIZE(32)) OPTIONAL, salt OCTET STRING (SIZE(8..16)) OPTIONAL, with ICCID(s) for hashing serviceProviderName [17] UTF8String (SIZE(0..32)) OPTIONAL, operatorId [23] OperatorId OPTIONAL }
+
+VerifySmdsResponseResponse ::= [69] CHOICE { verifySmdsResponseOk NULL, verifySmdsResponseError INTEGER { invalidSignature(2), noSession(4), invalidTransactionId(5), undefinedError(127) } }
+
+LoadRpmPackageRequest ::= [68] SEQUENCE { smdpSigned3 SmdpSigned3, smdpSignature3 [APPLICATION 55] OCTET STRING, targetEsimPort INTEGER OPTIONAL }
+
+SmdpSigned3 ::= SEQUENCE { transactionId [0] TransactionId, rpmPackage [1] RpmPackage, rpmPending [2] NULL OPTIONAL }
+
+PrepareDeviceChangeRequest ::= [77] SEQUENCE { smdpSigned4 SmdpSigned4, smdpSignature4 [APPLICATION 55] OCTET STRING, hashCc Octet32 OPTIONAL }
+
+SmdpSigned4 ::= SEQUENCE { transactionId [0] TransactionId, SM-DP+ ccRequiredFlag BOOLEAN, activationCodeForProfileRecovery [1] UTF8String (SIZE(0..255)) OPTIONAL }
+
+PrepareDeviceChangeResponse ::= [77] CHOICE { prepareDeviceChangeResponseOk PrepareDeviceChangeResponseOk, prepareDeviceChangeResponseError PrepareDeviceChangeResponseError }
+
+PrepareDeviceChangeResponseOk ::= SEQUENCE { euiccSigned3 EUICCSigned3, euiccSignature3 [APPLICATION 55] OCTET STRING }
+
+EUICCSigned3 ::= SEQUENCE { transactionId [0] TransactionId, eacEuiccOtpk [APPLICATION 73] OCTET STRING OPTIONAL, hashCc Octet32 OPTIONAL, additionalInformation VendorSpecificExtension OPTIONAL }
+
+PrepareDeviceChangeResponseError ::= SEQUENCE { transactionId [0] TransactionId, downloadErrorCode DownloadErrorCode SGP.22 RSP Technical Specification }
+
+VerifyDeviceChangeRequest ::= [75] SEQUENCE { smdpSigned5 SmdpSigned5, smdpSignature5 [APPLICATION 55] OCTET STRING }
+
+SmdpSigned5 ::= SEQUENCE { transactionId [0] TransactionId, deviceChangeResponse [1] DeviceChangeResponse }
+
+DeviceChangeResponse ::= CHOICE { deviceChangeData [0] DeviceChangeData, encryptedDeviceChangeData [1] EncryptedDeviceChangeData }
+
+DeviceChangeData ::= SEQUENCE { iccid Iccid, activationCodeForDc [0] UTF8String (SIZE(0..255)), deleteOldProfile [1] NULL OPTIONAL, required deleteNotificationForDcSupport [2] NULL OPTIONAL, Device Change supported notificationAddress [3] UTF8String OPTIONAL, Notification for Device Change profileRecoverySupport [4] NULL OPTIONAL, profileRecoveryValidityPeriod [5] GeneralizedTime OPTIONAL }
+
+EncryptedDeviceChangeData ::= SEQUENCE { controlRefTemplate [6] IMPLICIT ControlRefTemplate, eacSmdpOtpk [APPLICATION 73] OCTET STRING, sequenceOf87 [1] SEQUENCE OF [7] OCTET STRING }
+
+VerifyDeviceChangeResponse ::= [75] CHOICE { verifyDeviceChangeOk DeviceChangeData, verifyDeviceChangeError INTEGER { invalidSignature(2), disallowedByPolicy(3), noSession(4), invalidTransactionId(5), unsupportedCrtValues(6), invalidData(7), profileNotInDisabledState(8), undefinedError(127) } }
+
+VerifySmdpResponseRequest ::= [96] SEQUENCE { smdpSigned6 SmdpSigned6, smdpSignature6 [APPLICATION 55] OCTET STRING }
+
+SmdpSigned6 ::= SEQUENCE { transactionId [0] TransactionId, requestSpecificData CHOICE { retryData [0] SEQUENCE { retryDelay [0] INTEGER, ready dcSessionId [1] OCTET STRING (SIZE(1..16)) } } }
+
+VerifySmdpResponseResponse ::= [96] CHOICE { verifySmdpResponseOk NULL, verifySmdpResponseError INTEGER { invalidSignature(2), noSession(4), invalidTransactionId(5), undefinedError(127) } }
+
+VerifyProfileRecoveryRequest ::= [98] SEQUENCE { smdpSigned4 SmdpSigned4, smdpSignature4 [APPLICATION 55] OCTET STRING }
+
+VerifyProfileRecoveryResponse ::= [98] CHOICE { verifyProfileRecoveryOk NULL, verifyProfileRecoveryError INTEGER { invalidSignature(2), noSession(4), invalidTransactionId(5), undefinedError(127) } }
+
+E4ERequest ::= [PRIVATE 4] CHOICE { startDownload [0] SEQUENCE { activationCode [0] UTF8String (SIZE(0..255)) }, confirmDownload [1] SEQUENCE { enable [0] NULL OPTIONAL, confirmationCode [1] UTF8String OPTIONAL, pinCode [2] UTF8String (SIZE(4..8)) OPTIONAL }, listProfiles [2] NULL, enableProfile [3] SEQUENCE {iccid [APPLICATION 26] Iccid}, disableProfile [4] SEQUENCE {iccid [APPLICATION 26] Iccid}, deleteProfile [5] SEQUENCE { iccid [APPLICATION 26] Iccid, pinCode [1] UTF8String (SIZE(4..8)) OPTIONAL }, euiccMemReset [6] SEQUENCE { pinCode [0] UTF8String (SIZE(4..8)) OPTIONAL }, changeConfirmationPin [7] UTF8String (SIZE(9..17)), setRpmAllow [8] BOOLEAN, pollRpmPackage [9] SEQUENCE {iccid [APPLICATION 26] Iccid OPTIONAL}, confirmRpmPackage [10] SEQUENCE { pinCode [0] UTF8String (SIZE(4..8)) OPTIONAL }, cancelSession[11] NULL }
+
+E4EResponse ::= [PRIVATE 4] SEQUENCE { resultCode [0] E4EResultCode, resultData [1] CHOICE { startDownloadResponse [0] SEQUENCE { serviceProviderName [17] UTF8String (SIZE(0..32)), profileName [18] UTF8String (SIZE(0..64)), ccRequired [0] NULL OPTIONAL }, listProfilesResponse [3] SEQUENCE OF SEQUENCE { iccid [APPLICATION 26] Iccid, profileState [112] ProfileState, serviceProviderName [17] UTF8String (SIZE(0..32)), profileName [18] UTF8String (SIZE(0..64)) }, pollRpmPackageResponse [4] SEQUENCE { rpmPackage [0] RpmPackage, rpmPending [1] NULL OPTIONAL }, confirmDownloadResponse [5] SEQUENCE { iccid [APPLICATION 26] Iccid } } OPTIONAL }
+
+E4EResultCode ::= INTEGER { errorBusy (1), errorComm (2), errorAuth (3), errorNoProfile (4), errorEligibility (5), errorInstall (6), errorPin (7), errorProfileRef (8), errorAlreadyEnabled (9), errorAlreadyDisabled (10), errorConfirmationCode (11), errorRpmDisabled (12), errorProfileDoesNotExist (13), undefinedError (127) }
+
+RemoteProfileProvisioningRequest ::= [2] CHOICE { initiateAuthenticationRequest [57] InitiateAuthenticationRequest, authenticateClientRequest [59] AuthenticateClientRequest, getBoundProfilePackageRequest [58] GetBoundProfilePackageRequest, cancelSessionRequestEs9 [65] CancelSessionRequestEs9, handleNotification [61] HandleNotification, confirmDeviceChangeRequest [76] ConfirmDeviceChangeRequest, checkEventRequest [70] CheckEventRequest, checkProgressRequest [97] CheckProgressRequest }
+
+RemoteProfileProvisioningResponse ::= [2] CHOICE { initiateAuthenticationResponse [57] InitiateAuthenticationResponse, authenticateClientResponseEs9 [59] AuthenticateClientResponseEs9, getBoundProfilePackageResponse [58] GetBoundProfilePackageResponse, cancelSessionResponseEs9 [65] CancelSessionResponseEs9, authenticateClientResponseEs11 [64] AuthenticateClientResponseEs11, confirmDeviceChangeResponse [76] ConfirmDeviceChangeResponse, checkEventResponse [70] CheckEventResponse, checkProgressResponse [97] CheckProgressResponse }
+
+InitiateAuthenticationRequest ::= [57] SEQUENCE { euiccChallenge [1] Octet16, smdpAddress [3] UTF8String, euiccInfo1 EUICCInfo1, lpaRspCapability [5] LpaRspCapability OPTIONAL }
+
+InitiateAuthenticationResponse ::= [57] CHOICE { initiateAuthenticationOk InitiateAuthenticationOkEs9, initiateAuthenticationError INTEGER { invalidDpAddress(1), euiccVersionNotSupportedByDp(2), ciPKIdNotSupported(3), invalidInputData(124), missingInputData(125), functionProviderBusy(126), undefinedError(127) } }
+
+InitiateAuthenticationOkEs9 ::= SEQUENCE { transactionId [0]TransactionId, serverSigned1 ServerSigned1, serverSignature1 [APPLICATION 55] OCTET STRING, euiccCiPKIdToBeUsed SubjectKeyIdentifier OPTIONAL, serverCertificate Certificate, otherCertsInChain [1] CertificateChain OPTIONAL, crlList [2] SEQUENCE OF CertificateList OPTIONAL RFC 5280 }
+
+AuthenticateClientRequest ::= [59] SEQUENCE { transactionId [0] TransactionId, authenticateServerResponse [56] AuthenticateServerResponse, deleteNotificationForDc DeleteNotificationForDc OPTIONAL Delete Notification for Device Change, see section 4.1.3 }
+
+AuthenticateClientResponseEs9 ::= [59] CHOICE { authenticateClientOk AuthenticateClientOk, authenticateClientError INTEGER { eumCertificateInvalid(1), eumCertificateExpired(2), euiccCertificateInvalid(3), euiccCertificateExpired(4), euiccSignatureInvalid(5), matchingIdRefused(6), eidMismatch(7), noEligibleProfile(8), ciPKUnknown(9), invalidTransactionId(10), insufficientMemory(11), ciPKMismatch(12), euiccRspCapabilityHasChanged(13), lpaRspCapabilityHasChanged(14), deviceChangeNotSupported(15), deviceChangeNotAllowed(16), iccidUnkwon(17), invalidInputData(124), missingInputData(125), functionProviderBusy(126), undefinedError(127) }, authenticateClientOkRpm AuthenticateClientOkRpm, authenticateClientOkDeviceChange AuthenticateClientOkDeviceChange, authenticateClientOkDelayedDeviceChange AuthenticateClientOkDelayedDeviceChange }
+
+AuthenticateClientOk ::= SEQUENCE { transactionId [0] TransactionId, profileMetadata [37] StoreMetadataRequest, smdpSigned2 SmdpSigned2, smdpSignature2 [APPLICATION 55] OCTET STRING, smdpCertificate Certificate }
+
+AuthenticateClientOkRpm ::= SEQUENCE { transactionId [0] TransactionId, smdpSigned3 SmdpSigned3, smdpSignature3 [APPLICATION 55] OCTET STRING }
+
+AuthenticateClientOkDeviceChange ::= SEQUENCE { SGP.22 RSP Technical Specification transactionId [0] TransactionId, smdpSigned4 SmdpSigned4, smdpSignature4 [APPLICATION 55] OCTET STRING, serviceProviderMessageForDc [1] LocalisedTextMessage OPTIONAL Provider Message For Device Change }
+
+AuthenticateClientOkDelayedDeviceChange ::= SEQUENCE { transactionId [0] TransactionId, smdpSigned6 SmdpSigned6, smdpSignature6 [APPLICATION 55] OCTET STRING }
+
+GetBoundProfilePackageRequest ::= [58] SEQUENCE { transactionId [0] TransactionId, prepareDownloadResponse [33] PrepareDownloadResponse }
+
+GetBoundProfilePackageResponse ::= [58] CHOICE { getBoundProfilePackageOk GetBoundProfilePackageOk, getBoundProfilePackageError INTEGER { euiccSignatureInvalid(1), confirmationCodeMissing(2), confirmationCodeRefused(3), confirmationCodeRetriesExceeded(4), bppRebindingRefused(5), downloadOrderExpired(6), invalidTransactionId(95), invalidInputData(124), missingInputData(125), functionProviderBusy(126), undefinedError(127) } }
+
+GetBoundProfilePackageOk ::= SEQUENCE { transactionId [0] TransactionId, boundProfilePackage [54] BoundProfilePackage }
+
+HandleNotification ::= [61] SEQUENCE { pendingNotification PendingNotification }
+
+CancelSessionRequestEs9 ::= [65] SEQUENCE { transactionId TransactionId, cancelSessionResponse CancelSessionResponse ES10b.CancelSession function }
+
+CancelSessionResponseEs9 ::= [65] CHOICE { cancelSessionOk CancelSessionOk, cancelSessionError INTEGER { invalidTransactionId(1), euiccSignatureInvalid(2), invalidInputData(124), missingInputData(125), functionProviderBusy(126), undefinedError(127) } }
+
+CancelSessionOk ::= SEQUENCE {}
+
+AuthenticateClientResponseEs11 ::= [64] CHOICE { authenticateClientOk AuthenticateClientOkEs11V2, authenticateClientError INTEGER { eumCertificateInvalid(1), eumCertificateExpired(2), euiccCertificateInvalid(3), euiccCertificateExpired(4), euiccSignatureInvalid(5), SGP.22 RSP Technical Specification eventIdUnknown(6), invalidTransactionId(7), ciPKUnknown(8), ciPKMismatch(9), euiccRspCapabilityHasChanged(10), lpaRspCapabilityHasChanged(11), pushServiceNotSupport(12), pushServiceRegistrationNotSupported(13), invalidInputData(124), missingInputData(125), functionProviderBusy(126), undefinedError(127) }, authenticateClientOkV3 AuthenticateClientOkEs11V3 }
+
+AuthenticateClientOkEs11V2 ::= SEQUENCE { transactionId [0] TransactionId, eventEntries [1] SEQUENCE OF EventRecord }
+
+EventRecord ::= SEQUENCE { eventId UTF8String, rspServerAddress UTF8String }
+
+AuthenticateClientOkEs11V3 ::= SEQUENCE { transactionId [0] TransactionId, smdsSigned2 SmdsSigned2, smdsSignature2 [APPLICATION 55] OCTET STRING }
+
+CheckEventRequest ::= [70] SEQUENCE { ecId [0] OCTET STRING(SIZE(16..32)), smdsAddress [1] UTF8String }
+
+CheckEventResponse ::= [70] CHOICE { checkEventOk CheckEventOk, checkEventError INTEGER { invalidDsAddress(1), eventCheckingNotSupported(2), expiredEcid(3), unknownEcid(4), invalidInputData(124), missingInputData(125), functionProviderBusy(126), undefinedError(127) } }
+
+CheckEventOk ::= SEQUENCE { SGP.22 RSP Technical Specification isPendingEvent [0] BOOLEAN received ECID exists }
+
+ConfirmDeviceChangeRequest ::= [76] SEQUENCE { transactionId [0] TransactionId, prepareDeviceChangeResponse PrepareDeviceChangeResponse }
+
+ConfirmDeviceChangeResponse ::= [76] CHOICE { confirmDeviceChangeOk ConfirmDeviceChangeOk, confirmDeviceChangeError INTEGER { invalidTransactionId(1), euiccSignatureInvalid(2), confirmationCodeMissing(3), confirmationCodeRefused(4), confirmationCodeInvalidMatch(5), confirmationCodeRetriesExceeded(6), invalidInputData(124), missingInputData(125), functionProviderBusy(126), undefinedError(127) } }
+
+ConfirmDeviceChangeOk ::= SEQUENCE { transactionId [0] TransactionId, smdpSigned5 SmdpSigned5, smdpSignature5 [APPLICATION 55] OCTET STRING }
+
+CheckProgressRequest ::= [97] SEQUENCE { dcSessionId [0] OCTET STRING(SIZE(1..16)) }
+
+CheckProgressResponse ::= [97] CHOICE { checkProgressOk CheckProgressOk, checkProgressError INTEGER { unknowndcSessionId(4), invalidInputData(124), missingInputData(125), functionProviderBusy(126), undefinedError(127) } }
+
+CheckProgressOk ::= SEQUENCE { retryDelay [0] INTEGER OPTIONAL SM-DP+ to finish the relevant Profile preparation SGP.22 RSP Technical Specification }
+
+END

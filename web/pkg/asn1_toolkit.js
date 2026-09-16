@@ -251,9 +251,7 @@ export class Generated {
 if (Symbol.dispose) Generated.prototype[Symbol.dispose] = Generated.prototype.free;
 
 /**
- * Compile ASN.1 source to Rust bindings for the `rasn` framework.
- *
- * `backend` is either "rust" or "typescript".
+ * Compile ASN.1 source to bindings. `backend` is "rust" or "typescript".
  * @param {string} asn1
  * @param {string} backend
  * @returns {any}
@@ -316,6 +314,111 @@ export function compiler_version() {
 }
 
 /**
+ * WASM export: decode hex to a tree, returning a JS object.
+ * @param {string} hex
+ * @returns {any}
+ */
+export function decode_to_tree(hex) {
+    const ptr0 = passStringToWasm0(hex, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.decode_to_tree(ptr0, len0);
+    return ret;
+}
+
+/**
+ * A valid DER sample for the hex inspector: SGP.22 `OperatorId` with mccMnc
+ * 246/81, the worked example from SGP.22 §5.7.2.
+ * @returns {string}
+ */
+export function example_hex() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.example_hex();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
+ * A second sample: the same structure with a 3-digit MNC, to show that the
+ * ASN.1 layer cannot tell the two apart — the third digit lives inside the
+ * OCTET STRING and only TS 24.008 explains the packing.
+ * @returns {string}
+ */
+export function example_hex_3digit() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.example_hex_3digit();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
+ * A sample that is NOT ASN.1, to demonstrate the lookalike trap: real SGP.22
+ * Profile Element bytes. A BER reader returns one opaque primitive and no
+ * error, which is the whole hazard.
+ * @returns {string}
+ */
+export function example_hex_lookalike() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.example_hex_lookalike();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
+ * A nested DER sample: SEQUENCE containing INTEGER, BOOLEAN and UTF8String, so
+ * the tree view has something to expand.
+ *
+ * Length byte is 0x0E (14 content bytes): INTEGER 4 + BOOLEAN 3 + UTF8String 7.
+ * @returns {string}
+ */
+export function example_hex_nested() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.example_hex_nested();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
+ * A minimal schema, for a quick first look.
+ * @returns {string}
+ */
+export function example_minimal() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.example_minimal();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
  * Compiled-in example: a valid subset of SGP.22's RSPDefinitions.
  *
  * Hand-authored rather than extracted from the PDF — the extracted text does
@@ -333,6 +436,45 @@ export function example_schema() {
     } finally {
         wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
     }
+}
+
+/**
+ * Schema structure is extracted in JavaScript, not here — see web/structure.js
+ * for the full reasoning. In short: rasn-compiler 0.16 has no public path from
+ * ASN.1 text to parsed types. `Compiler.state` is private with no accessor, the
+ * `lexer` module (holding the parser entry point) is private, and `compile()`
+ * consumes `self` and returns only generated text. The intermediate types are
+ * public as types, but nothing hands you an instance.
+ *
+ * `validate` therefore uses `compile()` as the front end: if code generation
+ * succeeds, the module parsed. That is a weaker check than parsing alone (a
+ * module can parse and still fail generation) and is labelled as such in the UI.
+ * WASM export: decode hex bytes into a TLV tree.
+ * @param {string} hex
+ * @returns {any}
+ */
+export function hex_to_tree(hex) {
+    const ptr0 = passStringToWasm0(hex, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.hex_to_tree(ptr0, len0);
+    return ret;
+}
+
+/**
+ * Validate only: reports whether the module parses and can be generated.
+ *
+ * Uses the compiler front end rather than a dedicated parse, because the parsed
+ * module is not reachable through the public API. A success here means "parsed
+ * and generated", which is slightly stronger than "parsed" — noted in the UI so
+ * the distinction is not overstated.
+ * @param {string} asn1
+ * @returns {any}
+ */
+export function validate(asn1) {
+    const ptr0 = passStringToWasm0(asn1, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.validate(ptr0, len0);
+    return ret;
 }
 function __wbg_get_imports() {
     const import0 = {

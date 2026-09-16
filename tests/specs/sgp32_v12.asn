@@ -1,0 +1,257 @@
+SGP32v12Test DEFINITIONS AUTOMATIC TAGS ::=
+BEGIN
+
+-- Extracted from SGP.32-v1.2.txt by scripts/extract_spec_asn1.py.
+-- Only type assignments that could be read with certainty are kept.
+-- Prose, IMPORTS and value assignments are omitted; the count below is
+-- therefore a floor on this spec's ASN.1 surface, not a total.
+
+EuiccPackageRequest ::= [81] SEQUENCE { euiccPackageSigned EuiccPackageSigned, eimSignature [APPLICATION 55] OCTET STRING }
+
+EuiccPackageSigned ::= SEQUENCE { eimId [0] UTF8String (SIZE(1..128)), eidValue [APPLICATION 26] Octet16, counterValue [1] INTEGER, eimTransactionId [2] TransactionId OPTIONAL, euiccPackage EuiccPackage }
+
+EuiccPackage ::= CHOICE { psmoList SEQUENCE OF Psmo, ecoList SEQUENCE OF Eco }
+
+EimConfigurationData ::= SEQUENCE { eimId [0] UTF8String (SIZE(1..128)), eimFqdn [1] UTF8String OPTIONAL, eimIdType [2] EimIdType OPTIONAL, counterValue [3] INTEGER OPTIONAL, associationToken [4] INTEGER OPTIONAL, eimPublicKeyData [5] CHOICE { eimPublicKey SubjectPublicKeyInfo, Package signature verification, where the encoding follows X.509 standard eimCertificate Certificate } OPTIONAL, trustedPublicKeyDataTls [6] CHOICE { trustedEimPkTls SubjectPublicKeyInfo, for TLS or DTLS, where the encoding follows X.509 standard trustedCertificateTls Certificate follows X.509 standard } OPTIONAL, eimSupportedProtocol [7] EimSupportedProtocol OPTIONAL, euiccCiPKId [8] SubjectKeyIdentifier OPTIONAL, Identifier supported on the eUICC for signature creation indirectProfileDownload[9] NULL OPTIONAL }
+
+EimIdType ::= INTEGER { eimIdTypeOid(1), eimIdTypeFqdn(2), eimIdTypeProprietary(3) }
+
+EimSupportedProtocol ::= BIT STRING { eimRetrieveHttps(0), eimRetrieveCoaps(1), eimInjectHttps(2), eimInjectCoaps(3), eimProprietary(4) }
+
+Eco ::= CHOICE { addEim [8] EimConfigurationData, 2.11.1 deleteEim [9] SEQUENCE {eimId [0] UTF8String}, updateEim [10] EimConfigurationData, listEim [11] SEQUENCE {} }
+
+Psmo ::= CHOICE { enable [3] SEQUENCE { iccid [APPLICATION 26] Iccid, rollbackFlag NULL OPTIONAL }, disable [4] SEQUENCE {iccid [APPLICATION 26] Iccid}, delete [5] SEQUENCE {iccid [APPLICATION 26] Iccid}, listProfileInfo [45] ProfileInfoListRequest, getRAT [6] SEQUENCE {}, configureImmediateEnable [7] SEQUENCE { immediateEnableFlag [0] NULL OPTIONAL, defaultSmdpOid [1] OBJECT IDENTIFIER OPTIONAL, defaultSmdpAddress [2] UTF8String OPTIONAL }, setFallbackAttribute [8] SEQUENCE {iccid [APPLICATION 26] Iccid}, unsetFallbackAttribute [9] SEQUENCE {}, setDefaultDpAddress [101] SetDefaultDpAddressRequest }
+
+IpaEuiccDataRequest ::= [82] SEQUENCE { tagList [APPLICATION 28] OCTET STRING, euiccCiPKIdentifierToBeUsed OCTET STRING OPTIONAL, Identifier (possibly truncated) supported on the eUICC for signature creation searchCriteriaNotification [1] CHOICE { seqNumber [0] INTEGER, profileManagementOperation [1] NotificationEvent } OPTIONAL, searchCriteriaEuiccPackageResult [2] CHOICE { seqNumber [0] INTEGER } OPTIONAL, eimTransactionId [3] TransactionId OPTIONAL }
+
+ProfileDownloadTriggerRequest ::= [84] SEQUENCE { profileDownloadData [0] ProfileDownloadData OPTIONAL, eimTransactionId [2] TransactionId OPTIONAL }
+
+ProfileDownloadData ::= CHOICE { activationCode [0] UTF8String (SIZE(0..255)), contactDefaultSmdp [1] NULL, contactSmds [2] SEQUENCE { smdsAddress UTF8String OPTIONAL } }
+
+EimAcknowledgements ::= [83] SEQUENCE OF SequenceNumber
+
+SequenceNumber ::= [0] INTEGER
+
+EuiccPackageResult ::= [81] CHOICE { euiccPackageResultSigned EuiccPackageResultSigned, euiccPackageErrorSigned EuiccPackageErrorSigned, euiccPackageErrorUnsigned EuiccPackageErrorUnsigned }
+
+EuiccPackageResultSigned ::= SEQUENCE { euiccPackageResultDataSigned EuiccPackageResultDataSigned, euiccSignEPR [APPLICATION 55] OCTET STRING }
+
+EuiccPackageResultDataSigned ::= SEQUENCE { eimId [0] UTF8String (SIZE(1..128)), counterValue [1] INTEGER, eimTransactionId[2] TransactionId OPTIONAL, seqNumber [3] INTEGER, euiccResult SEQUENCE OF EuiccResultData }
+
+EuiccResultData ::= CHOICE { enableResult [3] EnableProfileResult, disableResult [4] DisableProfileResult, deleteResult [5] DeleteProfileResult, listProfileInfoResult [45] ProfileInfoListResponse, getRATResult [6] RulesAuthorisationTable, configureImmediateEnableResult [7] ConfigureImmediateEnableResult, addEimResult [8] AddEimResult, deleteEimResult [9] DeleteEimResult, updateEimResult [10] UpdateEimResult, listEimResult [11] ListEimResult, rollbackResult [12] RollbackProfileResult, setFallbackAttributeResult [13] SetFallbackAttributeResult, unsetFallbackAttributeResult [14] UnsetFallbackAttributeResult, processingTerminated INTEGER { resultSizeOverflow(1), unknownOrDamagedCommand(2), undefinedError(127) }, setDefaultDpAddressResult [101] SetDefaultDpAddressResponse }
+
+EuiccPackageErrorSigned ::= SEQUENCE { euiccPackageErrorDataSigned EuiccPackageErrorDataSigned, euiccSignEPE [APPLICATION 55] OCTET STRING }
+
+EuiccPackageErrorDataSigned ::= SEQUENCE { eimId [0] UTF8String (SIZE(1..128)), counterValue [1] INTEGER, eimTransactionId [2] TransactionId OPTIONAL, euiccPackageErrorCode EuiccPackageErrorCode }
+
+EuiccPackageErrorCode ::= INTEGER { invalidEid(3), replayError(4), counterValueOutOfRange(6), sizeOverflow(15), ecallActive(104), undefinedError(127)}
+
+EuiccPackageErrorUnsigned ::= SEQUENCE { eimId [0] UTF8String (SIZE(1..128)), eimTransactionId [2] TransactionId OPTIONAL, associationToken [4] INTEGER OPTIONAL }
+
+ConfigureImmediateEnableResult ::= INTEGER { insufficientMemory(1), commandError(7), undefinedError(127) }
+
+EnableProfileResult ::= INTEGER { iccidOrAidNotFound(1), profileNotInDisabledState(2), disallowedByPolicy(3), catBusy(5), rollbackNotAvailable(20), undefinedError(127) }
+
+DisableProfileResult ::= INTEGER { iccidOrAidNotFound(1), profileNotInEnabledState(2), disallowedByPolicy(3), catBusy(5), undefinedError(127) }
+
+DeleteProfileResult ::= INTEGER { iccidOrAidNotFound(1), profileNotInDisabledState(2), disallowedByPolicy(3), rollbackNotAvailable(20), returnFallbackProfile(21), undefinedError(127) }
+
+ProfileInfoListResponse ::= [45] CHOICE { profileInfoListOk SEQUENCE OF ProfileInfo, profileInfoListError ProfileInfoListError }
+
+ProfileInfoListError ::= INTEGER { incorrectInputValues(1), profileChangeOngoing (11), undefinedError(127) }
+
+RollbackProfileResult ::= INTEGER { undefinedError(127) }
+
+SetFallbackAttributeResult ::= INTEGER { iccidOrAidNotFound (1), fallbackNotAllowed (2), fallbackProfileEnabled (3), undefinedError (127) }
+
+UnsetFallbackAttributeResult ::= INTEGER { noFallbackAttribute(2), fallbackProfileEnabled (3), commandError(7), undefinedError (127) }
+
+AddEimResult ::= CHOICE { associationToken [4] INTEGER, addEimResultCode INTEGER { insufficientMemory(1), associatedEimAlreadyExists(2), ciPKUnknown(3), invalidAssociationToken(5), counterValueOutOfRange(6), commandError(7), undefinedError(127) } }
+
+DeleteEimResult ::= INTEGER { eimNotFound(1), lastEimDeleted(2), commandError(7), undefinedError(127) }
+
+UpdateEimResult ::= INTEGER { eimNotFound (1), ciPKUnknown(3), counterValueOutOfRange(6), commandError(7), undefinedError(127) }
+
+ListEimResult ::= CHOICE { eimIdList SEQUENCE OF EimIdInfo, listEimError INTEGER { undefinedError(127) } }
+
+EimIdInfo ::= SEQUENCE { eimId [0] UTF8String (SIZE(1..128)), eimIdType [2] EimIdType OPTIONAL eimIdTypeFqdn }
+
+IpaEuiccDataErrorCode ::= INTEGER { incorrectTagList (1), euiccCiPKIdNotFound(5), ecallActive(104), undefinedError(127) }
+
+IpaEuiccDataResponseError ::= SEQUENCE { eimTransactionId [0] TransactionId OPTIONAL, ipaEuiccDataErrorCode IpaEuiccDataErrorCode }
+
+IpaEuiccDataResponse ::= [82] CHOICE { ipaEuiccData IpaEuiccData, ipaEuiccDataResponseError IpaEuiccDataResponseError }
+
+PendingNotificationList ::= SEQUENCE OF PendingNotification
+
+EuiccPackageResultList ::= SEQUENCE OF EuiccPackageResult
+
+IpaEuiccData ::= SEQUENCE { notificationsList [0] PendingNotificationList OPTIONAL, defaultSmdpAddress [1] UTF8String OPTIONAL, euiccPackageResultList [2] EuiccPackageResultList OPTIONAL, euiccInfo1 [32] EUICCInfo1 OPTIONAL, euiccInfo2 [34] EUICCInfo2 OPTIONAL, rootSmdsAddress [3] UTF8String OPTIONAL, associationToken [4] INTEGER OPTIONAL, eumCertificate [5] Certificate OPTIONAL, euiccCertificate [6] Certificate OPTIONAL, eimTransactionId [7] TransactionId OPTIONAL, ipaCapabilities [8] IpaCapabilities OPTIONAL, deviceInfo [9] DeviceInfo OPTIONAL }
+
+ProfileDownloadTriggerResult ::= [84] SEQUENCE { eimTransactionId [2] TransactionId OPTIONAL, profileDownloadTriggerResultData CHOICE { profileInstallationResult [55] ProfileInstallationResult, [4] profileDownloadError SEQUENCE { profileDownloadErrorReason [0] INTEGER { ecallActive (104), undefinedError(127) }, errorResponse OCTET STRING OPTIONAL } } }
+
+ISDRProprietaryApplicationTemplateIoT ::= [PRIVATE 1] SEQUENCE { euiccConfiguration BIT STRING { ipaeSupported(0), enabledProfile(1) } }
+
+IpaeActivationRequest ::= [66] SEQUENCE { ipaeOption BIT STRING { activateIpae(0) } }
+
+IpaeActivationResponse ::= [66] SEQUENCE { ipaeActivationResult INTEGER {ok(0), notSupported(1)} }
+
+IpaCapabilities ::= SEQUENCE { ipaFeatures [0] BIT STRING { directRspServerCommunication (0), indirectRspServerCommunication (1), eimDownloadDataHandling (2), eimCtxParams1Generation (3), eimProfileMetadataVerification (4), minimizeEsipaBytes (5) }, ipaSupportedProtocols [1] BIT STRING { ipaRetrieveHttps(0), ipaRetrieveCoaps(1), ipaInjectHttps(2), ipaInjectCoaps(3), ipaProprietary(4) } OPTIONAL }
+
+ProfileInfo ::= [PRIVATE 3] SEQUENCE { iccid Iccid OPTIONAL, isdpAid [APPLICATION 15] OctetTo16 OPTIONAL, profileState [112] ProfileState OPTIONAL, profileNickname [16] UTF8String (SIZE(0..64)) OPTIONAL, serviceProviderName [17] UTF8String (SIZE(0..32)) OPTIONAL, profileName [18] UTF8String (SIZE(0..64)) OPTIONAL, iconType [19] IconType OPTIONAL, icon [20] OCTET STRING (SIZE(0..1024)) OPTIONAL, profileClass [21] ProfileClass OPTIONAL, notificationConfigurationInfo [22] SEQUENCE OF NotificationConfigurationInformation OPTIONAL, profileOwner [23] OperatorId OPTIONAL, dpProprietaryData [24] DpProprietaryData OPTIONAL, profilePolicyRules [25] PprIds OPTIONAL, serviceSpecificDataStoredInEuicc [34] VendorSpecificExtension OPTIONAL, ecallIndication [123] BOOLEAN OPTIONAL, fallbackAttribute [38] BOOLEAN DEFAULT FALSE, Fallback Profile if set to TRUE fallbackAllowed [103] BOOLEAN OPTIONAL Fallback is authorized by the Profile Owner }
+
+AuthenticateClientRequest ::= [59] SEQUENCE { transactionId [0] TransactionId, authenticateServerResponse [56] AuthenticateServerResponse }
+
+EUICCInfo2 ::= [34] SEQUENCE { profileVersion [1] VersionType, supported svn [2] VersionType, SGP.32 euiccFirmwareVer [3] VersionType, extCardResource [4] OCTET STRING, uiccCapability [5] UICCCapability, ts102241Version [6] VersionType OPTIONAL, globalplatformVersion [7] VersionType OPTIONAL, rspCapability [8] RspCapability, euiccCiPKIdListForVerification [9] SEQUENCE OF SubjectKeyIdentifier, List of CI Public Key Identifiers supported on the eUICC for signature verification euiccCiPKIdListForSigning [10] SEQUENCE OF SubjectKeyIdentifier, of CI Public Key Identifier supported on the eUICC for signature creation euiccCategory [11] INTEGER { basicEuicc(1), mediumEuicc(2), contactlessEuicc(3) } OPTIONAL, forbiddenProfilePolicyRules [25] PprIds OPTIONAL, ppVersion VersionType, sasAcreditationNumber UTF8String (SIZE(0..64)), certificationDataObject [12] CertificationDataObject OPTIONAL, treProperties [13] BIT STRING { isDiscrete(0), isIntegrated(1), usesRemoteMemory(2) the Remote Memory Protection Function described in SGP.21 [4] } OPTIONAL, treProductReference [14] UTF8String OPTIONAL, additionalEuiccProfilePackageVersions [15] SEQUENCE OF VersionType OPTIONAL, ipaMode [16] IpaMode OPTIONAL, euiccCiPKIdListForSigningV3 [17] SEQUENCE OF SubjectKeyIdentifier OPTIONAL, additionalEuiccInfo [18] OCTET STRING (SIZE(0..32)) OPTIONAL, highestSvn [19] VersionType OPTIONAL, SGP.32 iotSpecificInfo [20] IoTSpecificInfo OPTIONAL }
+
+IoTSpecificInfo ::= SEQUENCE { iotVersion [0] SEQUENCE OF VersionType, ecallSupported [1] NULL OPTIONAL, Emergency Mechanism fallbackSupported [2] NULL OPTIONAL Fallback Mechanism }
+
+IpaMode ::= INTEGER {}
+
+AddInitialEimRequest ::= [87] SEQUENCE { eimConfigurationDataList [0] SEQUENCE OF EimConfigurationData }
+
+AddInitialEimResponse ::= [87] CHOICE { addInitialEimOk SEQUENCE OF CHOICE { associationToken [4] INTEGER, addOk NULL }, addInitialEimError INTEGER { insufficientMemory(1), associatedEimAlreadyExists (2), ciPKUnknown(3), invalidAssociationToken(5), counterValueOutOfRange(6), commandError(7), undefinedError(127) } }
+
+EuiccMemoryResetRequest ::= [100] SEQUENCE { resetOptions [2] BIT STRING { deleteOperationalProfiles(0), deleteFieldLoadedTestProfiles(1), resetDefaultSmdpAddress(2), deletePreLoadedTestProfiles(3), deleteProvisioningProfiles(4), resetEimConfigData(5), resetImmediateEnableConfig (6) } }
+
+EuiccMemoryResetResponse ::= [100] SEQUENCE { resetResult INTEGER {ok(0), nothingToDelete(1), catBusy(5), ecallActive(104), undefinedError(127)}, resetEimResult INTEGER {ok(0), nothingToDelete(1), eimResetNotSupported(2), undefinedError(127)} OPTIONAL, resetImmediateEnableConfigResult INTEGER {ok(0), resetIECNotSupported (1), undefinedError(127)} OPTIONAL }
+
+GetCertsRequest ::= [86] SEQUENCE { euiccCiPKId SubjectKeyIdentifier OPTIONAL }
+
+GetCertsResponse ::= [86] CHOICE { certs SEQUENCE { eumCertificate [5] Certificate, euiccCertificate [6] Certificate }, getCertsError INTEGER {invalidCiPKId(1), undfinedError(127)} }
+
+RetrieveNotificationsListRequest ::= [43] SEQUENCE { searchCriteria CHOICE { seqNumber [0] INTEGER, profileManagementOperation [1] NotificationEvent, euiccPackageResults [2] NULL } OPTIONAL }
+
+RetrieveNotificationsListResponse ::= [43] CHOICE { notificationList PendingNotificationList, notificationsListResultError INTEGER { undefinedError(127)}, euiccPackageResultList EuiccPackageResultList }
+
+ImmediateEnableRequest ::= [90] SEQUENCE { refreshFlag BOOLEAN }
+
+ImmediateEnableResponse ::= [90] SEQUENCE { immediateEnableResult [0] INTEGER { immediateEnableNotAvailable (1), noSessionContext(4), catBusy(5), undefinedError(127) } }
+
+ProfileRollbackRequest ::= [88] SEQUENCE { refreshFlag BOOLEAN }
+
+ProfileRollbackResponse ::= [88] SEQUENCE { cmdResult INTEGER { rollbackNotAllowed(1), catBusy(5), commandError(7), undefinedError(127) }, eUICCPackageResult [81] EuiccPackageResult OPTIONAL }
+
+ConfigureImmediateProfileEnablingRequest ::= [89] SEQUENCE { immediateEnableFlag [0] NULL OPTIONAL, defaultSmdpOid [1] OBJECT IDENTIFIER OPTIONAL, defaultSmdpAddress [2] UTF8String OPTIONAL }
+
+ConfigureImmediateProfileEnablingResponse ::= [89] SEQUENCE { configImmediateEnableResult [0] INTEGER { insufficientMemory(1), associatedEimAlreadyExists(2), undefinedError(127) } }
+
+GetEimConfigurationDataRequest ::= [85] SEQUENCE { searchCriteria CHOICE { eimId [0] UTF8String (SIZE(1..128)) } OPTIONAL }
+
+GetEimConfigurationDataResponse ::= [85] SEQUENCE { eimConfigurationDataList [0] SEQUENCE OF EimConfigurationData }
+
+ExecuteFallbackMechanismRequest ::= [93] SEQUENCE { refreshFlag BOOLEAN }
+
+ExecuteFallbackMechanismResponse ::= [93] SEQUENCE { executeFallbackMechanismResult [0] INTEGER { profileNotInDisabledState(2), catBusy(5), fallbackNotAvailable(6), commandError(7), ecallActive(104), undefinedError(127) } }
+
+ReturnFromFallbackRequest ::= [94] SEQUENCE { refreshFlag BOOLEAN }
+
+ReturnFromFallbackResponse ::= [94] SEQUENCE { returnFromFallbackResult [0] INTEGER { catBusy(5), fallbackNotAvailable(6), commandError(7), undefinedError(127) } }
+
+EnableEmergencyProfileRequest ::= [91] SEQUENCE { refreshFlag BOOLEAN }
+
+EnableEmergencyProfileResponse ::= [91] SEQUENCE { enableEmergencyProfileResult [0] INTEGER { profileNotInDisabledState(2), catBusy(5), ecallNotAvailable(8), undefinedError(127) } }
+
+DisableEmergencyProfileRequest ::= [92] SEQUENCE { refreshFlag BOOLEAN }
+
+DisableEmergencyProfileResponse ::= [92] SEQUENCE { disableEmergencyProfileResult [0] INTEGER { profileNotInEnabledState(2), catBusy(5), undefinedError(127) } }
+
+GetConnectivityParametersRequest ::= [95] SEQUENCE {}
+
+GetConnectivityParametersResponse ::= [95] CHOICE { connectivityParameters ConnectivityParameters, connectivityParametersError ConnectivityParametersError }
+
+ConnectivityParameters ::= SEQUENCE { httpParams [1] OCTET STRING OPTIONAL }
+
+ConnectivityParametersError ::= INTEGER { parametersNotAvailable(1), undefinedError(127) }
+
+SetDefaultDpAddressRequest ::= [101] SEQUENCE { defaultDpAddress UTF8String }
+
+SetDefaultDpAddressResponse ::= [101] SEQUENCE { setDefaultDpAddressResult INTEGER { ok (0), undefinedError (127)} }
+
+PrepareDownloadResponse ::= [33] CHOICE { downloadResponseOk PrepareDownloadResponseOk, downloadResponseError PrepareDownloadResponseError, compactDownloadResponseOk CompactPrepareDownloadResponseOk }
+
+CompactPrepareDownloadResponseOk ::= SEQUENCE { compactEuiccSigned2 CompactEuiccSigned2, EuiccSigned2 euiccSignature2 [APPLICATION 55] OCTET STRING EuiccSigned2 }
+
+CompactEuiccSigned2 ::= SEQUENCE { euiccOtpk [APPLICATION 73] OCTET STRING OPTIONAL, hashCc Octet32 OPTIONAL }
+
+EuiccSigned1 ::= SEQUENCE { transactionId [0] TransactionId, serverAddress [3] UTF8String, serverChallenge [4] Octet16, euiccInfo2 [34] EUICCInfo2, ctxParams1 CtxParams1 }
+
+AuthenticateResponseOk ::= SEQUENCE { euiccSigned1 EuiccSigned1, euiccSignature1 [APPLICATION 55] OCTET STRING, euiccCertificate Certificate, eumCertificate Certificate }
+
+AuthenticateServerResponse ::= [56] CHOICE { authenticateResponseOk AuthenticateResponseOk, authenticateResponseError AuthenticateResponseError, compactAuthenticateResponseOk CompactAuthenticateResponseOk }
+
+CompactAuthenticateResponseOk ::= SEQUENCE { signedData CHOICE { euiccSigned1 EuiccSigned1, compactEuiccSigned1 [0] CompactEuiccSigned1 EuiccSigned1 }, euiccSignature1 [APPLICATION 55] OCTET STRING, EuiccSigned1 euiccCertificate [1] Certificate OPTIONAL, (CERT.EUICC.ECDSA) eumCertificate [2] Certificate OPTIONAL (CERT.EUM.ECDSA) }
+
+CompactEuiccSigned1 ::= SEQUENCE { extCardResource [4] OCTET STRING, ctxParams1 [2] CtxParams1 OPTIONAL }
+
+PendingNotification ::= CHOICE { profileInstallationResult [55] ProfileInstallationResult, otherSignedNotification OtherSignedNotification, compactProfileInstallationResult [0] CompactProfileInstallationResult, compactOtherSignedNotification [1] CompactOtherSignedNotification }
+
+ProfileInstallationResult ::= [55] SEQUENCE { profileInstallationResultData [39] ProfileInstallationResultData, euiccSignPIR EuiccSignPIR }
+
+CompactProfileInstallationResult ::= SEQUENCE { compactProfileInstallationResultData [0] CompactProfileInstallationResultData, euiccSignPIR EuiccSignPIR }
+
+CompactProfileInstallationResultData ::= SEQUENCE { transactionId [0] TransactionId, SM-DP+ seqNumber INTEGER, iccidPresent BOOLEAN DEFAULT TRUE, compactFinalResult [2] CHOICE { compactSuccessResult CompactSuccessResult, errorResult ErrorResult } }
+
+CompactSuccessResult ::= SEQUENCE { compactAid [APPLICATION 15] OCTET STRING (SIZE (2)), of ISD-P AID simaResponse OCTET STRING OPTIONAL simaResponse value (EUICCResponse) is different from the 9-byte value ‘30 07 A0 05 30 03 80 01 00’ representing success }
+
+CompactOtherSignedNotification ::= SEQUENCE { eidValue [APPLICATION 26] Octet16 OPTIONAL, tbsOtherNotification NotificationMetadata, euiccNotificationSignature [APPLICATION 55] OCTET STRING }
+
+CancelSessionResponse ::= [65] CHOICE { cancelSessionResponseOk CancelSessionResponseOk, cancelSessionResponseError INTEGER {invalidTransactionId(5), undefinedError(127)}, compactCancelSessionResponseOk CompactCancelSessionResponseOk }
+
+CompactCancelSessionResponseOk ::= SEQUENCE { compactEuiccCancelSessionSigned CompactEuiccCancelSessionSigned, Compact version of euiccCancelSessionSigned euiccCancelSessionSignature [APPLICATION 55] OCTET STRING }
+
+CompactEuiccCancelSessionSigned ::= SEQUENCE { reason CancelSessionReason OPTIONAL }
+
+EsipaMessageFromIpaToEim ::= CHOICE { initiateAuthenticationRequestEsipa [57] InitiateAuthenticationRequestEsipa, authenticateClientRequestEsipa [59] AuthenticateClientRequestEsipa, Tag 'BF3B' getBoundProfilePackageRequestEsipa [58] GetBoundProfilePackageRequestEsipa, cancelSessionRequestEsipa [65] CancelSessionRequestEsipa, handleNotificationEsipa [61] HandleNotificationEsipa, transferEimPackageResponse [78] TransferEimPackageResponse, getEimPackageRequest [79] GetEimPackageRequest, provideEimPackageResult [80] ProvideEimPackageResult }
+
+EsipaMessageFromEimToIpa ::= CHOICE { initiateAuthenticationResponseEsipa [57] InitiateAuthenticationResponseEsipa, authenticateClientResponseEsipa [59] AuthenticateClientResponseEsipa, Tag 'BF3B' getBoundProfilePackageResponseEsipa [58] GetBoundProfilePackageResponseEsipa, cancelSessionResponseEsipa [65] CancelSessionResponseEsipa, transferEimPackageRequest [78] TransferEimPackageRequest, getEimPackageResponse [79] GetEimPackageResponse, provideEimPackageResultResponse [80] ProvideEimPackageResultResponse Tag 'BF50' }
+
+InitiateAuthenticationRequestEsipa ::= [57] SEQUENCE { euiccChallenge [1] Octet16, smdpAddress [3] UTF8String OPTIONAL, euiccInfo1 EUICCInfo1 OPTIONAL, eimTransactionId [2] TransactionId OPTIONAL }
+
+InitiateAuthenticationResponseEsipa ::= [57] CHOICE { initiateAuthenticationOkEsipa InitiateAuthenticationOkEsipa, initiateAuthenticationErrorEsipa INTEGER { invalidDpAddress(1), euiccVersionNotSupportedByDp(2), ciPKIdNotSupported(3), smdpAddressMismatch(50), smdpOidMismatch(51), invalidEimTransactionId(52), undefinedError(127) } }
+
+InitiateAuthenticationOkEsipa ::= SEQUENCE { transactionId [0] TransactionId OPTIONAL, serverSigned1 ServerSigned1, serverSignature1 [APPLICATION 55] OCTET STRING, euiccCiPKIdentifierToBeUsed OCTET STRING, ES10b.AuthenticateServer serverCertificate Certificate, matchingId UTF8String OPTIONAL, ctxParams1 [2] CtxParams1 OPTIONAL }
+
+AuthenticateClientRequestEsipa ::= [59] SEQUENCE { transactionId [0] TransactionId, SM-DP+/SM-DS authenticateServerResponse [56] AuthenticateServerResponse }
+
+AuthenticateClientResponseEsipa ::= [59] CHOICE { authenticateClientOkDPEsipa AuthenticateClientOkDPEsipa, authenticateClientOkDSEsipa AuthenticateClientOkDSEsipa, authenticateClientErrorEsipa INTEGER { eumCertificateInvalid(1), eumCertificateExpired(2), euiccCertificateInvalid(3), euiccCertificateExpired(4), euiccSignatureInvalid(5), matchingIdRefused(6), eidMismatch(7), noEligibleProfile(8), ciPKUnknown(9), invalidTransactionId(10), insufficientMemory(11), pprNotAllowed(50), eventIdUnknown(56), undefinedError(127) } }
+
+AuthenticateClientOkDPEsipa ::= SEQUENCE { transactionId [0] TransactionId OPTIONAL, profileMetaData [37] StoreMetadataRequest OPTIONAL, smdpSigned2 SmdpSigned2, smdpSignature2 [APPLICATION 55] OCTET STRING, smdpCertificate Certificate, hashCc Octet32 OPTIONAL }
+
+AuthenticateClientOkDSEsipa ::= SEQUENCE { transactionId [0] TransactionId, SM-DS profileDownloadTrigger [84] ProfileDownloadTriggerRequest OPTIONAL Tag 'BF54' }
+
+GetBoundProfilePackageRequestEsipa ::= [58] SEQUENCE { transactionId [0] TransactionId, SM-DP+ prepareDownloadResponse [33] PrepareDownloadResponse }
+
+GetBoundProfilePackageResponseEsipa ::= [58] CHOICE { getBoundProfilePackageOkEsipa GetBoundProfilePackageOkEsipa, getBoundProfilePackageErrorEsipa INTEGER { euiccSignatureInvalid(1), confirmationCodeMissing(2), confirmationCodeRefused(3), confirmationCodeRetriesExceeded(4), bppRebindingRefused(5), downloadOrderExpired(6), metadataMismatch(50), invalidTransactionId(95), undefinedError(127) } }
+
+GetBoundProfilePackageOkEsipa ::= SEQUENCE { transactionId [0] TransactionId OPTIONAL, boundProfilePackage [54] BoundProfilePackage }
+
+HandleNotificationEsipa ::= [61] CHOICE { pendingNotification [0] PendingNotification, provideEimPackageResult [80] ProvideEimPackageResult }
+
+CancelSessionRequestEsipa ::= [65] SEQUENCE { transactionId TransactionId, SM-DP+ cancelSessionResponse CancelSessionResponse ES10b. CancelSession function, possibly in compact format }
+
+CancelSessionResponseEsipa ::= [65] CHOICE { cancelSessionOk CancelSessionOk, cancelSessionError INTEGER { invalidTransactionId(1), euiccSignatureInvalid(2), undefinedError(127) } }
+
+CancelSessionOk ::= SEQUENCE {}
+
+StateChangeCause ::= INTEGER { otherEim(0), emergencyProfile(2), immediateEnableProfile(5), deviceChange(6), Device change (removable eSIMs) }
+
+GetEimPackageRequest ::= [79] SEQUENCE { eidValue [APPLICATION 26] Octet16, notifyStateChange [0] NULL OPTIONAL, stateChangeCause [1] StateChangeCause OPTIONAL, rPLMN [2] OCTET STRING (SIZE(3)) OPTIONAL registered PLMN, coded as defined in 3GPP TS 24.008 [22] }
+
+GetEimPackageResponse ::= [79] CHOICE { euiccPackageRequest [81] EuiccPackageRequest, ipaEuiccDataRequest [82] IpaEuiccDataRequest, profileDownloadTriggerRequest [84] ProfileDownloadTriggerRequest, eimPackageError INTEGER { noEimPackageAvailable(1), eidNotFound(2), invalidEid(3), missingEid(4), undefinedError(127) } }
+
+EimPackageResultErrorCode ::= INTEGER { invalidPackageFormat(1), unknownPackage(2), undefinedError(127) }
+
+EimPackageResultResponseError ::= SEQUENCE { eimTransactionId [0] TransactionId OPTIONAL, eimPackageResultErrorCode EimPackageResultErrorCode }
+
+EimPackageResult ::= CHOICE { euiccPackageResult [81] EuiccPackageResult, ePRAndNotifications SEQUENCE { euiccPackageResult [81] EuiccPackageResult, notificationList [0] PendingNotificationList }, ipaEuiccDataResponse [82] IpaEuiccDataResponse, profileDownloadTriggerResult [84] ProfileDownloadTriggerResult, eimPackageResultResponseError [0] EimPackageResultResponseError }
+
+ProvideEimPackageResult ::= [80] SEQUENCE { eidValue [APPLICATION 26] Octet16 OPTIONAL, eimPackageResult EimPackageResult }
+
+ProvideEimPackageResultResponse ::= [80] CHOICE { eimAcknowledgements [83] EimAcknowledgements, emptyResponse SEQUENCE {}, provideEimPackageResultError INTEGER { eidNotFound(2), invalidEid(3), missingEid(4), undefinedError(127) } }
+
+TransferEimPackageRequest ::= [78] CHOICE { euiccPackageRequest [81] EuiccPackageRequest, ipaEuiccDataRequest [82] IpaEuiccDataRequest, eimAcknowledgements [83] EimAcknowledgements, profileDownloadTriggerRequest [84] ProfileDownloadTriggerRequest }
+
+TransferEimPackageResponse ::= [78] CHOICE { euiccPackageResult [81] EuiccPackageResult, ePRAndNotifications SEQUENCE { euiccPackageResult [81] EuiccPackageResult, notificationList [0] PendingNotificationList }, ipaEuiccDataResponse [82] IpaEuiccDataResponse, eimPackageReceived NULL, eimPackageError INTEGER { invalidPackageFormat(1), unknownPackage(2), undefinedError(127) } }
+
+END

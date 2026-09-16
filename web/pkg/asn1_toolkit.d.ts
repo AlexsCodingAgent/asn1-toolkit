@@ -72,9 +72,7 @@ export class Generated {
 }
 
 /**
- * Compile ASN.1 source to Rust bindings for the `rasn` framework.
- *
- * `backend` is either "rust" or "typescript".
+ * Compile ASN.1 source to bindings. `backend` is "rust" or "typescript".
  */
 export function compile(asn1: string, backend: string): any;
 
@@ -88,12 +86,75 @@ export function compile_to_typescript(asn1: string): Generated;
 export function compiler_version(): string;
 
 /**
+ * WASM export: decode hex to a tree, returning a JS object.
+ */
+export function decode_to_tree(hex: string): any;
+
+/**
+ * A valid DER sample for the hex inspector: SGP.22 `OperatorId` with mccMnc
+ * 246/81, the worked example from SGP.22 §5.7.2.
+ */
+export function example_hex(): string;
+
+/**
+ * A second sample: the same structure with a 3-digit MNC, to show that the
+ * ASN.1 layer cannot tell the two apart — the third digit lives inside the
+ * OCTET STRING and only TS 24.008 explains the packing.
+ */
+export function example_hex_3digit(): string;
+
+/**
+ * A sample that is NOT ASN.1, to demonstrate the lookalike trap: real SGP.22
+ * Profile Element bytes. A BER reader returns one opaque primitive and no
+ * error, which is the whole hazard.
+ */
+export function example_hex_lookalike(): string;
+
+/**
+ * A nested DER sample: SEQUENCE containing INTEGER, BOOLEAN and UTF8String, so
+ * the tree view has something to expand.
+ *
+ * Length byte is 0x0E (14 content bytes): INTEGER 4 + BOOLEAN 3 + UTF8String 7.
+ */
+export function example_hex_nested(): string;
+
+/**
+ * A minimal schema, for a quick first look.
+ */
+export function example_minimal(): string;
+
+/**
  * Compiled-in example: a valid subset of SGP.22's RSPDefinitions.
  *
  * Hand-authored rather than extracted from the PDF — the extracted text does
  * not compile (wrapped prose inside comments, OIDs broken across lines).
  */
 export function example_schema(): string;
+
+/**
+ * Schema structure is extracted in JavaScript, not here — see web/structure.js
+ * for the full reasoning. In short: rasn-compiler 0.16 has no public path from
+ * ASN.1 text to parsed types. `Compiler.state` is private with no accessor, the
+ * `lexer` module (holding the parser entry point) is private, and `compile()`
+ * consumes `self` and returns only generated text. The intermediate types are
+ * public as types, but nothing hands you an instance.
+ *
+ * `validate` therefore uses `compile()` as the front end: if code generation
+ * succeeds, the module parsed. That is a weaker check than parsing alone (a
+ * module can parse and still fail generation) and is labelled as such in the UI.
+ * WASM export: decode hex bytes into a TLV tree.
+ */
+export function hex_to_tree(hex: string): any;
+
+/**
+ * Validate only: reports whether the module parses and can be generated.
+ *
+ * Uses the compiler front end rather than a dedicated parse, because the parsed
+ * module is not reachable through the public API. A success here means "parsed
+ * and generated", which is slightly stronger than "parsed" — noted in the UI so
+ * the distinction is not overstated.
+ */
+export function validate(asn1: string): any;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
@@ -122,7 +183,15 @@ export interface InitOutput {
     readonly compile_to_typescript: (a: number, b: number) => [number, number, number];
     readonly compiler_version: () => [number, number];
     readonly config_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
+    readonly decode_to_tree: (a: number, b: number) => any;
+    readonly example_hex: () => [number, number];
+    readonly example_hex_3digit: () => [number, number];
+    readonly example_hex_lookalike: () => [number, number];
+    readonly example_hex_nested: () => [number, number];
+    readonly example_minimal: () => [number, number];
     readonly example_schema: () => [number, number];
+    readonly hex_to_tree: (a: number, b: number) => any;
+    readonly validate: (a: number, b: number) => any;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
