@@ -19,6 +19,7 @@ const check = (name, fn) => {
 
 const app = readFileSync(new URL('./app.js', import.meta.url), 'utf8');
 const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
+const css = readFileSync(new URL('./style.css', import.meta.url), 'utf8');
 
 console.log('ux fixes\n');
 
@@ -183,13 +184,40 @@ check('the tabs follow the ARIA tabs pattern', () => {
   assert.ok(body.includes("aria-selected"), 'selectTab does not set aria-selected');
 });
 
-check('the radio groups are labelled as groups', () => {
-  const groups = [...html.matchAll(/<label class="seg"([^>]*)>/g)].map((m) => m[1]);
+check('each segmented group is a named radiogroup', () => {
+  // Now a div[role=radiogroup] containing one label per option. It used to be a
+  // single <label> wrapping every input, which is associated with only the FIRST
+  // control - so the other options had no accessible name and their visible text
+  // was not clickable.
+  const groups = [...html.matchAll(/<div class="seg"([^>]*)>/g)].map((m) => m[1]);
   assert.ok(groups.length >= 3, `expected 3 segmented controls, found ${groups.length}`);
   for (const attrs of groups) {
     assert.ok(attrs.includes('role="radiogroup"'), `segmented control missing radiogroup role: ${attrs}`);
     assert.ok(attrs.includes('aria-label'), `segmented control missing aria-label: ${attrs}`);
   }
+});
+
+check('every segmented option has its own label', () => {
+  // The regression that produced this check: one label per GROUP left every option
+  // after the first without an accessible name, and clicking its text did nothing.
+  for (const name of ['backend', 'sview', 'rules']) {
+    const opts = [...html.matchAll(new RegExp(`<input type="radio" name="${name}"[^>]*>`, 'g'))];
+    assert.ok(opts.length >= 2, `${name} has ${opts.length} options`);
+    for (const m of opts) {
+      const around = html.slice(Math.max(0, m.index - 60), m.index);
+      assert.ok(/<label>\s*$/.test(around),
+        `${name}: an option is not wrapped in its own <label> — it will have no name and no click target`);
+    }
+  }
+});
+
+check('segmented inputs are not hidden with display:none', () => {
+  // display:none removes the control from the accessibility tree entirely:
+  // unreachable by keyboard, invisible to a screen reader, unclickable for tooling.
+  assert.ok(!/label\.seg input \{ display: none/.test(css),
+    'segmented inputs are display:none and therefore unusable without a mouse');
+  assert.ok(/clip-path: inset\(50%\)/.test(css),
+    'the accessible hiding technique is missing');
 });
 
 check('the wrap toggle exposes its state', () => {

@@ -131,6 +131,39 @@ jobs:
           echo "::endgroup::"
           exit $fail
 
+      # The button audit drives a real browser, so it needs the site served and
+      # Playwright installed. Kept separate from the headless suites above, because
+      # a failure here is about the page rather than about a module.
+      #
+      # It found a genuine defect the headless suites could not: clicking a
+      # segmented option did nothing, because one <label> wrapped the whole group
+      # (a label is associated with only its first control) and the inputs were
+      # hidden with display:none, which removes them from the accessibility tree.
+      - name: Install Playwright chromium
+        run: npx --yes playwright@1.49.0 install --with-deps chromium
+
+      - name: Audit every button in a real browser
+        env:
+          AUDIT_BASE: http://127.0.0.1:8791/index.html
+        run: |
+          cd web
+          python3 -m http.server 8791 &
+          SERVER=$!
+          # Poll for readiness rather than sleeping a fixed amount.
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8791/index.html > /dev/null && break
+            sleep 1
+          done
+          set +e
+          NODE_PATH="$(npm root -g)" node test-buttons.mjs
+          STATUS=$?
+          set -e
+          kill $SERVER 2>/dev/null || true
+          if [ $STATUS -ne 0 ]; then
+            echo "::error::the button audit failed"
+            exit $STATUS
+          fi
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 

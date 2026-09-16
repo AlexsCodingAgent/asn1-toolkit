@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ASN.1 Toolkit — eUICC.tech</title>
 <meta name="description" content="Compile, inspect and encode ASN.1 from the GSMA eSIM specifications — SGP.02, SGP.22, SGP.32. Runs entirely in your browser; nothing is uploaded.">
-<link rel="stylesheet" href="./style.css?v=0.4.2">
+<link rel="stylesheet" href="./style.css?v=0.5.0">
 </head>
 <body>
 
@@ -42,10 +42,10 @@
   <!-- ================= 1. COMPILER ================= -->
   <section class="panel" id="panel-compile" role="tabpanel" aria-labelledby="tab-compile">
     <div class="toolbar">
-      <label class="seg" role="radiogroup" aria-label="Output language" title="Output language">
-        <input type="radio" name="backend" value="rust" checked><span>Rust</span>
-        <input type="radio" name="backend" value="typescript"><span>TypeScript</span>
-      </label>
+      <div class="seg" role="radiogroup" aria-label="Output language" title="Output language">
+        <label><input type="radio" name="backend" value="rust" checked><span>Rust</span></label>
+        <label><input type="radio" name="backend" value="typescript"><span>TypeScript</span></label>
+      </div>
       <button class="primary" id="btnCompile">Compile</button>
       <button id="btnExample">SGP.22 example</button>
       <button id="btnMinimal">Minimal</button>
@@ -136,10 +136,10 @@
     <div class="toolbar">
       <button class="primary" id="btnStructure">Analyse</button>
       <button id="btnStructExample">SGP.22 example</button>
-      <label class="seg" role="radiogroup" aria-label="Filter the type list" title="Filter the type list">
-        <input type="radio" name="sview" value="tree" checked><span>Grouped</span>
-        <input type="radio" name="sview" value="flat"><span>All types</span>
-      </label>
+      <div class="seg" role="radiogroup" aria-label="Filter the type list" title="Filter the type list">
+        <label><input type="radio" name="sview" value="tree" checked><span>Grouped</span></label>
+        <label><input type="radio" name="sview" value="flat"><span>All types</span></label>
+      </div>
       <div class="spacer"></div>
       <button id="btnStructCopy" title="Copy the extracted structure as text">Copy summary</button>
     </div>
@@ -188,12 +188,12 @@
   <section class="panel" id="panel-encode" role="tabpanel" aria-labelledby="tab-encode" hidden>
     <div class="toolbar">
       <button class="primary" id="btnEncode">Encode</button>
-      <label class="seg" role="radiogroup" aria-label="Encoding rules" title="Encoding rules">
-        <input type="radio" name="rules" value="DER" checked><span>DER</span>
-        <input type="radio" name="rules" value="BER"><span>BER</span>
-        <input type="radio" name="rules" value="CER"><span>CER</span>
-        <input type="radio" name="rules" value="PER"><span>PER</span>
-      </label>
+      <div class="seg" role="radiogroup" aria-label="Encoding rules" title="Encoding rules">
+        <label><input type="radio" name="rules" value="DER" checked><span>DER</span></label>
+        <label><input type="radio" name="rules" value="BER"><span>BER</span></label>
+        <label><input type="radio" name="rules" value="CER"><span>CER</span></label>
+        <label><input type="radio" name="rules" value="PER"><span>PER</span></label>
+      </div>
       <select id="typeSelect" aria-label="Type to encode"
               style="font:inherit;font-size:.85rem;padding:6px 10px;border-radius:8px;background:var(--panel);color:var(--ink-dim);border:1px solid var(--line)">
       </select>
@@ -344,6 +344,6 @@ actual structure: el(0x83, len=11)
   </section>
 </main>
 
-<script type="module" src="./app.js?v=0.4.2"></script>
+<script type="module" src="./app.js?v=0.5.0"></script>
 </body>
 </html>

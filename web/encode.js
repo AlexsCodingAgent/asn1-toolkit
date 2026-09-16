@@ -806,11 +806,33 @@ function toBigInt(v) {
 /** Accepts "01 02 ff", "0x0102ff", "0102ff", or an array of numbers. */
 export function toBytes(v) {
   if (Array.isArray(v)) return v.map((b) => Number(b) & 0xff);
+
+  // Objects and other non-strings get a message that says what is wrong.
+  //
+  // `String({})` is "[object Object]", which is what used to reach the user: a
+  // JavaScript internal leaking into an error message, describing neither the
+  // fault nor the fix. A nested object where a hex string belongs is the common
+  // case — someone pastes a sub-structure into a leaf field — so say that.
+  if (v !== null && typeof v === 'object') {
+    const preview = JSON.stringify(v);
+    const short = preview.length > 60 ? preview.slice(0, 57) + '...' : preview;
+    throw new Error(
+      `expected a hex string but found an object ${short} — this field takes bytes, ` +
+      'written as "00 01 ff"'
+    );
+  }
+  if (typeof v === 'number' || typeof v === 'boolean') {
+    throw new Error(`expected a hex string but found ${typeof v} ${v} — write bytes as "00 01 ff"`);
+  }
+
   const s = String(v ?? '').trim();
   if (!s) return [];
   const cleaned = s.replace(/^0x/i, '').replace(/[\s:,-]/g, '');
   if (!/^[0-9a-fA-F]*$/.test(cleaned)) {
-    throw new Error(`"${s}" is not hex`);
+    const bad = [...cleaned].find((c) => !/[0-9a-fA-F]/.test(c));
+    throw new Error(
+      `"${s}" is not hex — ${JSON.stringify(bad)} found at position ${cleaned.indexOf(bad) + 1}`
+    );
   }
   if (cleaned.length % 2) throw new Error(`"${s}" has an odd number of hex digits`);
   const out = [];
