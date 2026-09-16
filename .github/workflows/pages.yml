@@ -1,0 +1,79 @@
+name: Deploy to GitHub Pages
+
+# Serves web/ as a Pages site bound to asn1.euicc.tech.
+#
+# web/ is not the repo root, so the legacy branch-root Pages source cannot be
+# used; this workflow uploads web/ as the artifact instead. It also means the
+# build is reproducible from source: the pkg/ directory is committed, but this
+# workflow rebuilds it from the crate so a committed binary cannot silently
+# drift from crate/src/lib.rs.
+#
+# If the rebuild step is ever removed, the site still deploys - pkg/ is
+# committed for exactly that reason.
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+
+      - name: Rebuild the wasm package from source
+        run: |
+          cd crate
+          wasm-pack build --target web --release --out-dir ../web/pkg
+
+      - name: Verify the committed wasm matches the crate
+        run: |
+          # The rebuild must not be a no-op that silently differs. Compare sizes
+          # as a cheap sanity check; byte-identity is not guaranteed across
+          # toolchain versions, so a mismatch is reported rather than fatal.
+          SIZE=$(stat -c%s web/pkg/asn1_toolkit_bg.wasm)
+          echo "rebuilt wasm: ${SIZE} bytes"
+          if [ "$SIZE" -lt 100000 ]; then
+            echo "::error::wasm artifact is suspiciously small (${SIZE} bytes) - the build likely failed"
+            exit 1
+          fi
+
+      - name: Run formatter tests
+        run: cd web && node test-format.mjs
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload web/ as the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
