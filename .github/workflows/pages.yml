@@ -75,16 +75,43 @@ jobs:
           cd web
           node stamp-modules.mjs "$(date -u +%Y%m%d%H%M%S)"
 
+      # Fail the deploy if an import would ship unversioned. A stale module is
+      # silent breakage: the page loads, most of it works, and the panels that
+      # depend on the changed module do nothing.
+      #
+      # The check is done in node rather than grep. The obvious grep pattern
+      # matched `./format.js` INSIDE `./format.js?v=...` and so reported all seven
+      # stamped imports as unversioned - a false alarm that failed a good deploy.
+      # Reusing the script's own finder removes that class of mistake.
       - name: Verify the stamped page has no unversioned asset
         run: |
           cd web
-          unresolved=$(grep -oE "\\./[A-Za-z0-9_/.-]+\\.js" app.js | grep -v "?v=" || true)
-          if [ -n "$unresolved" ]; then
-            echo "::error::these imports would ship unversioned and be cached for 4h:"
-            echo "$unresolved"
-            exit 1
-          fi
-          echo "all local module imports are versioned"
+          node -e "
+            const fs = require('fs');
+            const src = fs.readFileSync('app.js', 'utf8');
+            const out = [];
+            let i = 0;
+            while ((i = src.indexOf('from', i)) !== -1) {
+              let j = i + 4;
+              if (/[A-Za-z0-9_$]/.test(src[j] || '')) { i = j; continue; }
+              while (src[j] === ' ' || src[j] === '\\t') j++;
+              const q = src[j];
+              if (q !== String.fromCharCode(39) && q !== String.fromCharCode(34)) { i = j; continue; }
+              const close = src.indexOf(q, j + 1);
+              if (close === -1) break;
+              const spec = src.slice(j + 1, close);
+              if (spec.startsWith('./') && spec.split('?')[0].endsWith('.js') && !spec.includes('?v=')) {
+                out.push(spec);
+              }
+              i = close + 1;
+            }
+            if (out.length) {
+              console.error('::error::these imports would ship unversioned and be cached for 4h:');
+              for (const s of out) console.error('  ' + s);
+              process.exit(1);
+            }
+            console.log('all local module imports are versioned');
+          "
 
       # Every suite, not just the formatter. A green deploy that skipped the
       # encoder or highlighter tests would be evidence of nothing.
