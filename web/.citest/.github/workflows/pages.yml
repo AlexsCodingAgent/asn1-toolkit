@@ -1,0 +1,151 @@
+name: Deploy to GitHub Pages
+
+# Serves web/ as a Pages site bound to asn1.euicc.tech.
+#
+# web/ is not the repo root, so the legacy branch-root Pages source cannot be
+# used; this workflow uploads web/ as the artifact instead. It also means the
+# build is reproducible from source: the pkg/ directory is committed, but this
+# workflow rebuilds it from the crate so a committed binary cannot silently
+# drift from crate/src/lib.rs.
+#
+# If the rebuild step is ever removed, the site still deploys - pkg/ is
+# committed for exactly that reason.
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+
+      - name: Rebuild the wasm package from source
+        run: |
+          cd crate
+          wasm-pack build --target web --release --out-dir ../web/pkg
+
+      - name: Verify the committed wasm matches the crate
+        run: |
+          # The rebuild must not be a no-op that silently differs. Compare sizes
+          # as a cheap sanity check; byte-identity is not guaranteed across
+          # toolchain versions, so a mismatch is reported rather than fatal.
+          SIZE=$(stat -c%s web/pkg/asn1_toolkit_bg.wasm)
+          echo "rebuilt wasm: ${SIZE} bytes"
+          if [ "$SIZE" -lt 100000 ]; then
+            echo "::error::wasm artifact is suspiciously small (${SIZE} bytes) - the build likely failed"
+            exit 1
+          fi
+
+      # Version-stamp local module imports in the DEPLOYED app.js.
+      #
+      # This fixes the bug that actually reached the user. GitHub Pages serves .js
+      # with cache-control: max-age=14400 (four hours). Only app.js and the wasm
+      # were stamped, but app.js statically imports seven more local modules by
+      # their own unversioned URLs. After a deploy a browser could run the NEW
+      # app.js against a CACHED OLD structure.js / encode.js, and the mismatch made
+      # the Structure and Encoder panels do nothing when their buttons were
+      # pressed - with no visible error, because a failed module init is not
+      # surfaced anywhere.
+      #
+      # The script exits non-zero rather than shipping a half-stamped or corrupted
+      # file, and is idempotent. It lives in web/ so it can be run and tested
+      # locally.
+      - name: Stamp module imports for cache busting
+        run: |
+          cd web
+          node stamp-modules.mjs "$(date -u +%Y%m%d%H%M%S)"
+
+      # Fail the deploy if an import would ship unversioned. A stale module is
+      # silent breakage: the page loads, most of it works, and the panels that
+      # depend on the changed module do nothing.
+      #
+      # The check is done in node rather than grep. The obvious grep pattern
+      # matched `./format.js` INSIDE `./format.js?v=...` and so reported all seven
+      # stamped imports as unversioned - a false alarm that failed a good deploy.
+      # Reusing the script's own finder removes that class of mistake.
+      - name: Verify the stamped page has no unversioned asset
+        run: |
+          cd web
+          node -e "
+            const fs = require('fs');
+            const src = fs.readFileSync('app.js', 'utf8');
+            const out = [];
+            let i = 0;
+            while ((i = src.indexOf('from', i)) !== -1) {
+              let j = i + 4;
+              if (/[A-Za-z0-9_$]/.test(src[j] || '')) { i = j; continue; }
+              while (src[j] === ' ' || src[j] === '\\t') j++;
+              const q = src[j];
+              if (q !== String.fromCharCode(39) && q !== String.fromCharCode(34)) { i = j; continue; }
+              const close = src.indexOf(q, j + 1);
+              if (close === -1) break;
+              const spec = src.slice(j + 1, close);
+              if (spec.startsWith('./') && spec.split('?')[0].endsWith('.js') && !spec.includes('?v=')) {
+                out.push(spec);
+              }
+              i = close + 1;
+            }
+            if (out.length) {
+              console.error('::error::these imports would ship unversioned and be cached for 4h:');
+              for (const s of out) console.error('  ' + s);
+              process.exit(1);
+            }
+            console.log('all local module imports are versioned');
+          "
+
+      # Every suite, not just the formatter. A green deploy that skipped the
+      # encoder or highlighter tests would be evidence of nothing.
+      - name: Run test suites
+        run: |
+          cd web
+          fail=0
+          for t in test-format.mjs test-highlight.mjs test-clear.mjs test-clean.mjs test-ux.mjs test-panels.mjs test-cache.mjs enctest.mjs; do
+            echo "::group::$t"
+            node "$t" || fail=1
+            echo "::endgroup::"
+          done
+          # Parses ASN.1 extracted from five real GSMA specs; fails if any
+          # spec yields zero types, which is the silent-breakage case.
+          echo "::group::test-specs.mjs"
+          node test-specs.mjs || fail=1
+          echo "::endgroup::"
+          exit $fail
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload web/ as the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

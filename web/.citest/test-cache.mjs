@@ -39,7 +39,7 @@ const check = (name, fn) => {
 
 const app = readFileSync(new URL('./app.js', import.meta.url), 'utf8');
 const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
-const ci = readFileSync(new URL('../.github/workflows/pages.yml', import.meta.url), 'utf8');
+const ci = readFileSync(new URL('.github/workflows/pages.yml', import.meta.url), 'utf8');
 
 console.log('cache busting\n');
 
@@ -93,12 +93,8 @@ check('no import specifier contains an uninterpolated placeholder', () => {
 
 check('every imported module exists on disk', () => {
   for (const s of localImports) {
-    // Strip any query before resolving. CI stamps the source before running the
-    // suites, so by the time this runs the specifier may be `./format.js?v=…`,
-    // and stat'ing that literal path fails on a file that plainly exists.
-    const bare = s.spec.split('?')[0];
-    const file = new URL(bare, import.meta.url);
-    assert.ok(existsSync(file), 'import points at a missing file: ' + bare);
+    const file = new URL(s.spec.split('?')[0], import.meta.url);
+    assert.ok(existsSync(file), 'import points at a missing file: ' + s.spec);
   }
 });
 
