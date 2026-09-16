@@ -1,0 +1,13 @@
+/target
+crate/target
+*.bak
+
+# Cargo.lock IS committed for the crate: it pins rasn-compiler's version and the
+# tool's output depends on it. Regenerate with `cargo build` after changing deps.
+!crate/Cargo.lock
+
+# pkg/ is wasm-pack output. It is committed deliberately so the site can be
+# deployed without a Rust toolchain present. Regenerate with:
+#   cd crate && wasm-pack build --target web --release --out-dir ../web/pkg
+!web/pkg/
+!web/pkg/**

@@ -1,0 +1,35 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const __wbg_config_free: (a: number, b: number) => void;
+export const __wbg_generated_free: (a: number, b: number) => void;
+export const __wbg_get_config_custom_imports: (a: number) => [number, number];
+export const __wbg_get_config_default_wildcard_imports: (a: number) => number;
+export const __wbg_get_config_generate_from_impls: (a: number) => number;
+export const __wbg_get_config_no_std_compliant_bindings: (a: number) => number;
+export const __wbg_get_config_opaque_open_types: (a: number) => number;
+export const __wbg_get_config_type_annotations: (a: number) => [number, number];
+export const __wbg_get_generated_rust: (a: number) => [number, number];
+export const __wbg_get_generated_warnings: (a: number) => [number, number];
+export const __wbg_set_config_custom_imports: (a: number, b: number, c: number) => void;
+export const __wbg_set_config_default_wildcard_imports: (a: number, b: number) => void;
+export const __wbg_set_config_generate_from_impls: (a: number, b: number) => void;
+export const __wbg_set_config_no_std_compliant_bindings: (a: number, b: number) => void;
+export const __wbg_set_config_opaque_open_types: (a: number, b: number) => void;
+export const __wbg_set_config_type_annotations: (a: number, b: number, c: number) => void;
+export const __wbg_set_generated_rust: (a: number, b: number, c: number) => void;
+export const __wbg_set_generated_warnings: (a: number, b: number, c: number) => void;
+export const compile: (a: number, b: number, c: number, d: number) => any;
+export const compile_to_rust: (a: number, b: number, c: number) => [number, number, number];
+export const compile_to_typescript: (a: number, b: number) => [number, number, number];
+export const compiler_version: () => [number, number];
+export const config_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
+export const example_schema: () => [number, number];
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __wbindgen_externrefs: WebAssembly.Table;
+export const __externref_table_dealloc: (a: number) => void;
+export const __externref_table_alloc: () => number;
+export const __externref_drop_slice: (a: number, b: number) => void;
+export const __wbindgen_start: () => void;

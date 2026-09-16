@@ -1,0 +1,17 @@
+{
+  "name": "asn1-toolkit",
+  "type": "module",
+  "description": "Compile ASN.1 schemas to Rust/TypeScript in the browser. Built for eUICC.tech.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "asn1_toolkit_bg.wasm",
+    "asn1_toolkit.js",
+    "asn1_toolkit.d.ts"
+  ],
+  "main": "asn1_toolkit.js",
+  "types": "asn1_toolkit.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

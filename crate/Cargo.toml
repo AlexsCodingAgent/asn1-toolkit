@@ -1,0 +1,22 @@
+[package]
+name = "asn1-toolkit"
+version = "0.1.0"
+edition = "2024"
+description = "Compile ASN.1 schemas to Rust/TypeScript in the browser. Built for eUICC.tech."
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+rasn-compiler = "0.16.0"
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

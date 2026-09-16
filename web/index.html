@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASN.1 Compiler — eUICC.tech</title>
+<meta name="description" content="Compile ASN.1 schemas from GSMA eSIM specifications (SGP.22, SGP.32) to Rust and TypeScript bindings, entirely in your browser. Nothing is uploaded.">
+<style>
+  :root {
+    --bg:        #0d1b2a;
+    --bg-2:      #1b3a5c;
+    --panel:     #12293f;
+    --panel-2:   #16324d;
+    --line:      #24486b;
+    --ink:       #e8eef5;
+    --ink-dim:   #c8d6e5;
+    --muted:     #85a7c2;
+    --accent:    #85c1e9;
+    --accent-2:  #5dade2;
+    --good:      #7fd1a0;
+    --bad:       #f28b82;
+    --warn:      #f5c26b;
+    --mono: "SFMono-Regular", "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+
+  header {
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 100%);
+    padding: 26px 24px 22px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .kicker {
+    font-size: .72rem; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600; margin-bottom: 8px;
+  }
+  h1 { font-size: 1.65rem; margin: 0 0 8px; letter-spacing: -.015em; font-weight: 650; }
+  header p { margin: 0; color: var(--ink-dim); max-width: 74ch; font-size: .92rem; }
+  .badges { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge {
+    font-size: .72rem; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted); background: rgba(255,255,255,.02);
+  }
+  .badge b { color: var(--good); font-weight: 600; }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 22px 24px 60px; }
+
+  .toolbar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  label.seg {
+    display: inline-flex; border: 1px solid var(--line); border-radius: 8px;
+    overflow: hidden; background: var(--panel);
+  }
+  label.seg input { display: none; }
+  label.seg span {
+    padding: 7px 15px; font-size: .85rem; color: var(--muted);
+    cursor: pointer; user-select: none; transition: .12s;
+  }
+  label.seg input:checked + span {
+    background: var(--accent); color: #0d1b2a; font-weight: 600;
+  }
+  button {
+    font: inherit; font-size: .85rem; padding: 7px 15px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink-dim);
+    cursor: pointer; transition: .12s;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button.primary {
+    background: var(--accent); color: #0d1b2a; border-color: var(--accent); font-weight: 600;
+  }
+  button.primary:hover:not(:disabled) { background: var(--accent-2); border-color: var(--accent-2); color: #0d1b2a; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .spacer { flex: 1; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .pane {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden;
+    display: flex; flex-direction: column; min-width: 0;
+  }
+  .pane-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 13px; border-bottom: 1px solid var(--line);
+    background: var(--panel-2);
+    font-size: .78rem; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+  }
+  .pane-head .count { margin-left: auto; font-weight: 400; letter-spacing: 0; text-transform: none; }
+
+  textarea {
+    width: 100%; flex: 1; min-height: 470px; resize: none;
+    background: #0b1723; color: var(--ink);
+    border: 0; outline: 0; padding: 13px 15px;
+    font-family: var(--mono); font-size: 12.9px; line-height: 1.62;
+    tab-size: 3;
+  }
+  textarea::placeholder { color: #4d6b87; }
+
+  pre.out {
+    margin: 0; padding: 13px 15px; flex: 1; min-height: 470px;
+    overflow: auto; background: #0b1723;
+    font-family: var(--mono); font-size: 12.9px; line-height: 1.62;
+    white-space: pre; tab-size: 3;
+  }
+  pre.out.wrap { white-space: pre-wrap; word-break: break-word; }
+  pre.out:empty::before {
+    content: "Compiled bindings appear here.";
+    color: #4d6b87;
+  }
+
+  .status { margin-top: 14px; border-radius: 8px; padding: 11px 14px; font-size: .86rem; display: none; }
+  .status.show { display: block; }
+  .status.ok   { background: rgba(127,209,160,.09); border: 1px solid rgba(127,209,160,.35); color: var(--good); }
+  .status.err  { background: rgba(242,139,130,.09); border: 1px solid rgba(242,139,130,.35); color: var(--bad); }
+  .status.warn { background: rgba(245,194,107,.09); border: 1px solid rgba(245,194,107,.35); color: var(--warn); }
+  .status pre { margin: 7px 0 0; white-space: pre-wrap; font-family: var(--mono); font-size: .82rem; }
+
+  details.note {
+    margin-top: 22px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--panel); overflow: hidden;
+  }
+  details.note > summary {
+    padding: 11px 15px; cursor: pointer; font-size: .87rem; color: var(--accent);
+    font-weight: 600; background: var(--panel-2); list-style: none;
+  }
+  details.note > summary::-webkit-details-marker { display: none; }
+  details.note > summary::before { content: "▸ "; }
+  details.note[open] > summary::before { content: "▾ "; }
+  details.note .body { padding: 14px 16px 18px; font-size: .88rem; color: var(--ink-dim); }
+  details.note .body h3 { font-size: .95rem; margin: 16px 0 6px; color: var(--ink); }
+  details.note .body h3:first-child { margin-top: 0; }
+  details.note .body ul { margin: 6px 0; padding-left: 20px; }
+  details.note .body li { margin-bottom: 5px; }
+  code {
+    font-family: var(--mono); font-size: .87em;
+    background: rgba(133,193,233,.10); border: 1px solid rgba(133,193,233,.18);
+    padding: 1px 5px; border-radius: 4px; color: var(--accent);
+  }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 5px 16px; margin: 8px 0; }
+  .kv dt { color: var(--muted); font-size: .84rem; }
+  .kv dd { margin: 0; font-family: var(--mono); font-size: .84rem; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="kicker">eUICC.tech — tool</div>
+    <h1>ASN.1 Compiler</h1>
+    <p>
+      Paste an ASN.1 schema from the GSMA eSIM specifications and get Rust
+      (<code>rasn</code>) or TypeScript bindings back. Compilation runs in
+      WebAssembly on your own machine — the schema is never uploaded.
+    </p>
+    <div class="badges">
+      <span class="badge">wasm <b>✓</b> client-side only</span>
+      <span class="badge">no network calls</span>
+      <span class="badge">no upload</span>
+      <span class="badge" id="versionBadge">compiler —</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="toolbar">
+    <label class="seg" title="Output language">
+      <input type="radio" name="backend" value="rust" checked><span>Rust</span>
+      <input type="radio" name="backend" value="typescript"><span>TypeScript</span>
+    </label>
+    <button class="primary" id="btnCompile">Compile</button>
+    <button id="btnExample">SGP.22 example</button>
+    <button id="btnCopy">Copy output</button>
+    <button id="btnWrap" title="Toggle soft wrapping of long lines">Wrap: on</button>
+    <div class="spacer"></div>
+    <button id="btnClear">Clear</button>
+  </div>
+
+  <div class="grid">
+    <div class="pane">
+      <div class="pane-head">
+        <span>ASN.1 input</span>
+        <span class="count" id="inCount"></span>
+      </div>
+      <textarea id="input" spellcheck="false" autocapitalize="off" autocorrect="off"
+        placeholder="RSPDefinitions DEFINITIONS AUTOMATIC TAGS ::=&#10;BEGIN&#10;  OperatorId ::= SEQUENCE {&#10;     mccMnc OCTET STRING (SIZE(3)),&#10;     gid1   OCTET STRING OPTIONAL&#10;  }&#10;END"></textarea>
+    </div>
+    <div class="pane">
+      <div class="pane-head">
+        <span id="outLabel">Bindings</span>
+        <span class="count" id="outCount"></span>
+      </div>
+      <pre class="out wrap" id="output"></pre>
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <details class="note">
+    <summary>About this tool: what it does, and what it deliberately does not</summary>
+    <div class="body">
+      <h3>What it does</h3>
+      <p>
+        Compiles an ASN.1 module to Rust bindings for the
+        <a href="https://github.com/librasn/rasn" target="_blank" rel="noopener">rasn</a>
+        framework, or to TypeScript types. The parser is
+        <code>rasn-compiler</code>, compiled to WebAssembly.
+      </p>
+
+      <h3>Why it runs in your browser</h3>
+      <p>
+        GSMA specifications are not redistributable, and schemas derived from them
+        often inherit that. Nothing is sent anywhere — there is no server to send
+        it to. The page is static: no backend, no logging, no rate limit.
+      </p>
+
+      <h3>Formatting</h3>
+      <p>
+        Upstream, the Rust backend pipes its output through <code>rustfmt</code>. A
+        browser cannot spawn processes, so the raw code arrives as a single very
+        long line. This page formats it locally with a small pretty-printer aimed at
+        the shapes the generator emits.
+      </p>
+      <p>
+        It is not <code>rustfmt</code>, but the result is checked: the formatted
+        output parses cleanly under <code>rustfmt</code> and
+        <code>cargo check</code>. If you want canonical formatting, save it and run
+        <code>rustfmt</code>. The TypeScript backend formats itself.
+      </p>
+
+      <h3>What it does not do</h3>
+      <ul>
+        <li>
+          <b>It does not decode <code>mccMnc</code>.</b> SGP.22 declares it
+          <code>OCTET STRING (SIZE(3))</code> "coded as 3GPP TS 24.008". The ASN.1
+          says nothing about the internal layout, so a schema compiler gives you a
+          3-byte blob and stops. The digit packing is in TS 24.008 §10.5.1.3.
+        </li>
+        <li>
+          <b>It does not handle Profile Elements.</b> Those are not ASN.1 at all —
+          they are <code>E2 &lt;index&gt; &lt;length&gt; &lt;payload&gt;</code>, a bespoke
+          format that looks like TLV and is not. See below.
+        </li>
+        <li>
+          <b>It does not ingest a spec PDF.</b> Paste clean ASN.1. Text extracted
+          from a PDF has comments broken across lines and OIDs split mid-identifier,
+          and no compiler will take it.
+        </li>
+      </ul>
+
+      <h3>The ASN.1 / TLV-lookalike distinction</h3>
+      <p>
+        Worth knowing before you point this tool at anything: not every
+        tag-length-value format is ASN.1. A conforming reader meeting a lookalike
+        does not always error — it can return a structurally valid result holding
+        the wrong bytes.
+      </p>
+      <pre class="out" style="min-height:0;max-height:none;background:#0b1723;border-radius:6px;margin:10px 0;padding:12px 14px;border:1px solid var(--line)">Profile Element, SGP.22 (NOT ASN.1):
+    83 0b 80 09 08 29 99 18 11 32 54 76 98
+
+openssl asn1parse says:
+    0:d=0  hl=2 l=  11 prim: cont [ 3 ]      &lt;- one opaque blob, no error
+
+the actual structure:
+    el(0x83, len=11)
+      └─ el(0x80, len=9)
+           └─ 08 29 99 18 11 32 54 76 98   &lt;- length byte + EF-IMSI</pre>
+      <p>
+        <code>0x83</code> has bit 6 clear, so BER is <i>required</i> to call it
+        primitive and refuse to descend — but in the Profile Element format that
+        byte is an element index that does contain children. Use
+        <code>openssl asn1parse</code> on anything you are unsure of; if it returns
+        one primitive where you expected a tree, you are looking at a lookalike.
+      </p>
+
+      <h3>Which specifications are actually ASN.1</h3>
+      <dl class="kv">
+        <dt>SGP.22 (RSP)</dt><dd>yes — <code>RSPDefinitions</code>, 98 blocks</dd>
+        <dt>SGP.32 (IoT)</dt><dd>yes — IPA/eIM definitions</dd>
+        <dt>ETSI TS 102.223 (SIM Toolkit)</dt><dd>no — COMPREHENSION-TLV</dd>
+        <dt>3GPP TS 31.111 (USIM Toolkit)</dt><dd>no — COMPREHENSION-TLV</dd>
+      </dl>
+      <p>
+        The two Toolkit specs contain no ASN.1 at all. If you want a SIM Toolkit
+        decoder, this is the wrong tool.
+      </p>
+
+      <h3>Verified behaviour</h3>
+      <p>
+        Checked against a valid subset of SGP.22 §5.7.2 and Annex H: the module
+        header's <code>AUTOMATIC TAGS</code> is honoured,
+        <code>SIZE(3)</code> becomes <code>FixedOctetString&lt;3&gt;</code>,
+        <code>OPTIONAL</code> becomes <code>Option&lt;…&gt;</code>, and
+        <code>[APPLICATION 26]</code> on <code>Iccid</code> is preserved.
+      </p>
+    </div>
+  </details>
+</main>
+
+<script type="module">
+import init, { compile, compiler_version, example_schema } from './pkg/asn1_toolkit.js';
+import { formatRust } from './format.js';
+
+const $ = (id) => document.getElementById(id);
+const input = $('input'), output = $('output'), status = $('status');
+
+function backend() {
+  return document.querySelector('input[name=backend]:checked').value;
+}
+
+function setStatus(kind, msg, detail) {
+  status.className = 'status show ' + kind;
+  status.textContent = msg;
+  if (detail) {
+    const pre = document.createElement('pre');
+    pre.textContent = detail;
+    status.appendChild(pre);
+  }
+}
+
+function clearStatus() { status.className = 'status'; status.textContent = ''; }
+
+function counts() {
+  const t = input.value;
+  $('inCount').textContent = t ? t.split('\n').length + ' lines' : '';
+  const o = output.textContent;
+  $('outCount').textContent = o ? o.split('\n').length + ' lines' : '';
+}
+
+function run() {
+  clearStatus();
+  const src = input.value;
+  const be = backend();
+  let res;
+  try {
+    res = compile(src, be);
+  } catch (e) {
+    output.textContent = '';
+    setStatus('err', 'Compiler crashed: ' + (e && e.message ? e.message : String(e)));
+    counts();
+    return;
+  }
+
+  if (!res.ok) {
+    output.textContent = '';
+    setStatus('err', 'Compilation failed.', res.error);
+    counts();
+    return;
+  }
+
+  // The Rust backend pipes through rustfmt upstream; a browser cannot spawn
+  // processes, so it arrives as one very long line. Format it here.
+  let text = res.output;
+  let formatted = false;
+  if (be === 'rust') {
+    const pretty = formatRust(text);
+    if (pretty && pretty !== text) { text = pretty; formatted = true; }
+  }
+  output.textContent = text;
+  $('outLabel').textContent = be === 'rust' ? 'Rust (rasn)' : 'TypeScript';
+
+  const parts = [];
+  const nl = text.split('\n').length;
+  parts.push('Compiled ' + nl + ' line' + (nl === 1 ? '' : 's') + ' of ' + be + '.');
+  if (be === 'rust' && formatted) {
+    parts.push('Formatted locally — rustfmt cannot run in a browser, so this is a lightweight equivalent.');
+  }
+  if (res.warnings && res.warnings.length) {
+    setStatus('warn', parts.join(' ') + ' ' + res.warnings.length + ' warning(s) — see output.',
+              res.warnings.join('\n'));
+  } else {
+    setStatus('ok', parts.join(' '));
+  }
+  counts();
+}
+
+$('btnCompile').addEventListener('click', run);
+$('btnExample').addEventListener('click', () => {
+  input.value = example_schema();
+  run();
+});
+$('btnClear').addEventListener('click', () => {
+  input.value = ''; output.textContent = ''; clearStatus(); counts(); input.focus();
+});
+$('btnWrap').addEventListener('click', () => {
+  const on = output.classList.toggle('wrap');
+  $('btnWrap').textContent = 'Wrap: ' + (on ? 'on' : 'off');
+});
+$('btnCopy').addEventListener('click', async () => {
+  const o = output.textContent;
+  if (!o) return;
+  try {
+    await navigator.clipboard.writeText(o);
+    setStatus('ok', 'Copied ' + o.split('\n').length + ' lines to the clipboard.');
+  } catch {
+    setStatus('err', 'Clipboard blocked by the browser. Select the output and copy manually.');
+  }
+});
+input.addEventListener('input', counts);
+for (const r of document.querySelectorAll('input[name=backend]')) {
+  r.addEventListener('change', () => { if (output.textContent) run(); });
+}
+
+// Ctrl/Cmd+Enter compiles.
+input.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); }
+});
+
+await init();
+$('versionBadge').textContent = 'compiler v' + compiler_version();
+input.value = example_schema();
+counts();
+run();
+</script>
+</body>
+</html>
