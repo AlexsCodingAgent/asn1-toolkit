@@ -140,7 +140,9 @@ jobs:
       # (a label is associated with only its first control) and the inputs were
       # hidden with display:none, which removes them from the accessibility tree.
       - name: Install Playwright chromium
-        run: npx --yes playwright@1.49.0 install --with-deps chromium
+        run: |
+          npm install --no-save playwright@1.49.0
+          npx playwright install --with-deps chromium
 
       - name: Audit every button in a real browser
         env:
@@ -154,12 +156,22 @@ jobs:
             curl -sf http://127.0.0.1:8791/index.html > /dev/null && break
             sleep 1
           done
+
           set +e
-          NODE_PATH="$(npm root -g)" node test-buttons.mjs
-          STATUS=$?
+          node test-buttons.mjs 2>&1 | tee /tmp/audit.log
+          STATUS=${PIPESTATUS[0]}
           set -e
           kill $SERVER 2>/dev/null || true
-          if [ $STATUS -ne 0 ]; then
+
+          # The audit exits 0 when it cannot find Playwright, so a broken install
+          # would let CI go green without checking a single button. That is worse
+          # than no check, because it reports safety it does not provide. The skip
+          # is only acceptable on a developer machine.
+          if grep -q "playwright not available" /tmp/audit.log; then
+            echo "::error::the button audit skipped itself - Playwright was not importable"
+            exit 1
+          fi
+          if [ "$STATUS" -ne 0 ]; then
             echo "::error::the button audit failed"
             exit $STATUS
           fi
