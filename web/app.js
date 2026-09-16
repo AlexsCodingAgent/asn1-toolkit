@@ -30,7 +30,7 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 // Single build stamp for every asset this page loads: the stylesheet, the wasm
 // binary, and the module URLs in index.html. Bump it on release so a redeploy is
 // never masked by a cached asset.
-const BUILD = '0.4.1';
+const BUILD = '0.4.2';
 
 
 // ---------------------------------------------------------------------------

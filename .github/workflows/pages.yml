@@ -56,13 +56,43 @@ jobs:
             exit 1
           fi
 
+      # Version-stamp local module imports in the DEPLOYED app.js.
+      #
+      # This fixes the bug that actually reached the user. GitHub Pages serves .js
+      # with cache-control: max-age=14400 (four hours). Only app.js and the wasm
+      # were stamped, but app.js statically imports seven more local modules by
+      # their own unversioned URLs. After a deploy a browser could run the NEW
+      # app.js against a CACHED OLD structure.js / encode.js, and the mismatch made
+      # the Structure and Encoder panels do nothing when their buttons were
+      # pressed - with no visible error, because a failed module init is not
+      # surfaced anywhere.
+      #
+      # The script exits non-zero rather than shipping a half-stamped or corrupted
+      # file, and is idempotent. It lives in web/ so it can be run and tested
+      # locally.
+      - name: Stamp module imports for cache busting
+        run: |
+          cd web
+          node stamp-modules.mjs "$(date -u +%Y%m%d%H%M%S)"
+
+      - name: Verify the stamped page has no unversioned asset
+        run: |
+          cd web
+          unresolved=$(grep -oE "\\./[A-Za-z0-9_/.-]+\\.js" app.js | grep -v "?v=" || true)
+          if [ -n "$unresolved" ]; then
+            echo "::error::these imports would ship unversioned and be cached for 4h:"
+            echo "$unresolved"
+            exit 1
+          fi
+          echo "all local module imports are versioned"
+
       # Every suite, not just the formatter. A green deploy that skipped the
       # encoder or highlighter tests would be evidence of nothing.
       - name: Run test suites
         run: |
           cd web
           fail=0
-          for t in test-format.mjs test-highlight.mjs test-clear.mjs test-clean.mjs test-ux.mjs test-panels.mjs enctest.mjs; do
+          for t in test-format.mjs test-highlight.mjs test-clear.mjs test-clean.mjs test-ux.mjs test-panels.mjs test-cache.mjs enctest.mjs; do
             echo "::group::$t"
             node "$t" || fail=1
             echo "::endgroup::"
