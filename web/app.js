@@ -30,7 +30,7 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 // Single build stamp for every asset this page loads: the stylesheet, the wasm
 // binary, and the module URLs in index.html. Bump it on release so a redeploy is
 // never masked by a cached asset.
-const BUILD = '0.4.0';
+const BUILD = '0.4.1';
 
 
 // ---------------------------------------------------------------------------
@@ -972,6 +972,18 @@ async function boot() {
   runCompile();
 
   // Seed the other panels so no tab is empty on first visit.
+  //
+  // renderStructure() is the one that used to be missing, and its absence was
+  // only visible to anyone whose last tab was Structure: the tab is restored from
+  // localStorage, the panel is un-hidden, and it shows an empty body with just its
+  // toolbar — which reads as a broken tab rather than an unrun one. The compiler
+  // and decoder were seeded and so looked fine, which is exactly why this went
+  // unnoticed: the symptom depends on which tab you left.
+  //
+  // General rule from this: every panel must be initialised on boot, not on first
+  // tab switch. Tab switching must only ever reveal, never be responsible for
+  // producing content.
+  renderStructure();
   hexEditor.value = example_hex();
   renderHexEditor();
   runDecode();
