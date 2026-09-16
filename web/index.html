@@ -232,15 +232,18 @@
       <h3>Formatting</h3>
       <p>
         Upstream, the Rust backend pipes its output through <code>rustfmt</code>. A
-        browser cannot spawn processes, so the raw code arrives as a single very
-        long line. This page formats it locally with a small pretty-printer aimed at
-        the shapes the generator emits.
+        browser cannot spawn processes, so the raw Rust arrives as a single very
+        long line. The TypeScript backend has no formatter at all, so its output
+        arrives with odd indentation. This page normalises both locally, with two
+        small pretty-printers aimed at the shapes each backend emits.
       </p>
       <p>
-        It is not <code>rustfmt</code>, but the result is checked: the formatted
-        output parses cleanly under <code>rustfmt</code> and
-        <code>cargo check</code>. If you want canonical formatting, save it and run
-        <code>rustfmt</code>. The TypeScript backend formats itself.
+        These are not <code>rustfmt</code> or <code>prettier</code>, but the results
+        are checked rather than assumed: the Rust output passes
+        <code>rustfmt</code> and <code>cargo check</code> against
+        <code>rasn</code> 0.28, and the TypeScript output passes
+        <code>tsc --noEmit</code>. If you want canonical formatting, save the file
+        and run the real tool.
       </p>
 
       <h3>What it does not do</h3>
@@ -315,6 +318,7 @@ the actual structure:
 <script type="module">
 import init, { compile, compiler_version, example_schema } from './pkg/asn1_toolkit.js';
 import { formatRust } from './format.js';
+import { formatTypescript } from './format-ts.js';
 
 const $ = (id) => document.getElementById(id);
 const input = $('input'), output = $('output'), status = $('status');
@@ -370,6 +374,11 @@ function run() {
   if (be === 'rust') {
     const pretty = formatRust(text);
     if (pretty && pretty !== text) { text = pretty; formatted = true; }
+  } else if (be === 'typescript') {
+    // This backend has no upstream formatter either, so its layout arrives with
+    // odd indentation (namespaces pushed right, members at column 0).
+    const pretty = formatTypescript(text);
+    if (pretty && pretty !== text) { text = pretty; formatted = true; }
   }
   output.textContent = text;
   $('outLabel').textContent = be === 'rust' ? 'Rust (rasn)' : 'TypeScript';
@@ -377,8 +386,8 @@ function run() {
   const parts = [];
   const nl = text.split('\n').length;
   parts.push('Compiled ' + nl + ' line' + (nl === 1 ? '' : 's') + ' of ' + be + '.');
-  if (be === 'rust' && formatted) {
-    parts.push('Formatted locally — rustfmt cannot run in a browser, so this is a lightweight equivalent.');
+  if (formatted) {
+    parts.push('Formatted locally — the generator leaves layout to a formatter that cannot run in a browser.');
   }
   if (res.warnings && res.warnings.length) {
     setStatus('warn', parts.join(' ') + ' ' + res.warnings.length + ' warning(s) — see output.',

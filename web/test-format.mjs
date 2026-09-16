@@ -14,6 +14,7 @@
 
 import assert from 'node:assert/strict';
 import { formatRust } from './format.js';
+import { formatTypescript } from './format-ts.js';
 
 let pass = 0, fail = 0;
 function check(name, fn) {
@@ -94,6 +95,55 @@ check('empty or whitespace input is returned unchanged', () => {
 
 check('output is multi-line for multi-item input', () => {
   assert.ok(out.split('\n').length > 10, 'output stayed on one line: ' + out.split('\n').length);
+});
+
+// ---- TypeScript formatter -------------------------------------------------
+
+const TS_RAW = '\n                export namespace T {\n' +
+  '                    \n' +
+  'export type A = {\n' +
+  'x: string,\ny: string,\n        };\n' +
+  '        export type B = string | object;\n' +
+  '                }';
+
+const tsOut = formatTypescript(TS_RAW);
+
+check('ts: namespace is not indented', () => {
+  const l = tsOut.split('\n').find(x => x.includes('export namespace'));
+  assert.ok(l.startsWith('export namespace'), 'namespace indented: ' + JSON.stringify(l));
+});
+
+check('ts: members are indented one level inside a type body', () => {
+  // The type body sits inside the namespace, so members are at 8 (2 levels),
+  // and the type's own closing brace at 4 - not 4 and 0.
+  const lines = tsOut.split('\n');
+  const x = lines.find(l => l.trim().startsWith('x:'));
+  assert.ok(/^ {8}x:/.test(x), 'member not indented by 8: ' + JSON.stringify(x));
+});
+
+check('ts: closing brace of a type body aligns with its opening', () => {
+  const lines = tsOut.split('\n');
+  const open = lines.findIndex(l => l.includes('export type A'));
+  const close = lines.findIndex((l, i) => i > open && l.trim() === '};');
+  assert.ok(close > open, 'body was not closed');
+  // The type body is one level inside the namespace, so its closing brace is
+  // at 4, aligned with the `export type` line that opened it.
+  assert.equal(lines[close], '    };', 'closing brace misindented: ' + JSON.stringify(lines[close]));
+  assert.equal(lines[open], '    export type A = {', 'opening line misindented');
+});
+
+check('ts: no trailing whitespace on any line', () => {
+  const bad = tsOut.split('\n').filter(l => /\s+$/.test(l));
+  assert.equal(bad.length, 0, 'trailing whitespace: ' + JSON.stringify(bad.slice(0, 3)));
+});
+
+check('ts: no doubled spaces', () => {
+  const bad = tsOut.split('\n').filter(l => /  /.test(l.replace(/^ +/, '')));
+  assert.equal(bad.length, 0, 'doubled spaces: ' + JSON.stringify(bad.slice(0, 3)));
+});
+
+check('ts: empty input returned unchanged', () => {
+  assert.equal(formatTypescript(''), '');
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
