@@ -22,6 +22,7 @@ import { formatTypescript } from './format-ts.js';
 import { parseStructure } from './structure.js';
 import { encodeValue, encodeValuePer, toHex, valueTemplate, RULES } from './encode.js';
 import { highlightAsn1, highlightHex, hexByteCount } from './highlight.js';
+import { analyseArtefacts, cleanArtefacts, cleanWouldHelp } from './clean.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -278,6 +279,7 @@ function runCompile() {
   if (!res.ok) {
     $('#output').textContent = '';
     setStatus(statusEl, 'err', 'Compilation failed.', res.error);
+    offerCleanupIfUseful(src, be);
     return;
   }
 
@@ -304,6 +306,126 @@ function runCompile() {
   } else {
     setStatus(statusEl, 'ok', parts.join(' '));
   }
+}
+
+/**
+ * When a compile fails, decide whether PDF artefacts are the reason and say so.
+ *
+ * This is the fix for the tool's worst first impression. Pasting ASN.1 out of a
+ * GSMA PDF is the most likely first action, and the parser reports it as
+ * `Error matching ASN syntax at line 10` — naming a page header the user did not
+ * knowingly write, with nothing to suggest the paste, not their ASN.1, is the
+ * problem. The reasonable conclusion is that the tool is broken.
+ *
+ * So: compile the cleaned text. Only if THAT succeeds do we mention artefacts,
+ * which means the suggestion is never a guess — it is demonstrably the cause.
+ * A cleanup offer that did not fix the error would be noise.
+ */
+function offerCleanupIfUseful(src, backend) {
+  let analysis;
+  try {
+    analysis = analyseArtefacts(src);
+  } catch {
+    return;                       // detector failure must never mask the real error
+  }
+  if (!analysis.findings.length) return;
+
+  const result = cleanWouldHelp(src, (t) => compile(t, backend));
+  if (!result.helpful) {
+    // Artefacts are present but are not what broke it. Mention them as context
+    // without implying they are the cause.
+    const kinds = summariseArtefacts(analysis);
+    setStatus($('#status'), 'err', 'Compilation failed.', '');
+    const el = $('#status');
+    const extra = document.createElement('div');
+    extra.className = 'artefact-note';
+    extra.textContent =
+      `Note: this input also contains ${analysis.total} line(s) of PDF-derived ` +
+      `artefact (${kinds}) which the parser ignored. They are not the cause of the error above.`;
+    el.appendChild(extra);
+    return;
+  }
+
+  showCleanupOffer(src, analysis, result);
+}
+
+/** Human-readable summary of what kinds of artefact were found. */
+function summariseArtefacts(analysis) {
+  const counts = {};
+  for (const f of analysis.findings) {
+    for (const r of f.reasons) counts[r] = (counts[r] || 0) + 1;
+  }
+  return Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ');
+}
+
+/**
+ * Render the offer: a clear explanation, the affected lines, and one button.
+ *
+ * Deliberately shows WHICH lines before acting. This module deletes user text,
+ * and a silent deletion would be the worst possible behaviour — the user has to
+ * be able to see the casualties and disagree.
+ */
+function showCleanupOffer(src, analysis, result) {
+  const el = $('#status');
+  el.className = 'status show err';
+
+  const head = document.createElement('div');
+  head.innerHTML =
+    '<b>This looks like ASN.1 copied from a PDF, not a source file.</b> ' +
+    `The compiler stopped at text that is not ASN.1. Removing ` +
+    `${result.removed.length} line(s) makes it compile — nothing else changes.`;
+  el.appendChild(head);
+
+  const list = document.createElement('div');
+  list.className = 'artefact-lines';
+  for (const r of analysis.findings.slice(0, 8)) {
+    const row = document.createElement('div');
+    row.className = 'artefact-line';
+    const num = document.createElement('span');
+    num.className = 'artefact-num';
+    num.textContent = String(r.line).padStart(4, ' ');
+    const txt = document.createElement('span');
+    txt.className = 'artefact-pre';
+    txt.textContent = r.text.length > 88 ? r.text.slice(0, 85) + '...' : r.text;
+    const why = document.createElement('span');
+    why.className = 'artefact-why';
+    why.textContent = r.reasons.join(', ');
+    row.append(num, txt, why);
+    list.appendChild(row);
+  }
+  if (analysis.findings.length > 8) {
+    const more = document.createElement('div');
+    more.className = 'artefact-line';
+    more.textContent = `     ... and ${analysis.findings.length - 8} more`;
+    list.appendChild(more);
+  }
+  el.appendChild(list);
+
+  const actions = document.createElement('div');
+  actions.className = 'artefact-actions';
+
+  const clean = document.createElement('button');
+  clean.className = 'primary';
+  clean.id = 'btnCleanArtefacts';
+  clean.textContent = `Remove ${result.removed.length} artefact line(s) and compile`;
+  clean.addEventListener('click', () => {
+    // The cleaned text is the analysed text: re-derive rather than trust the
+    // button state, so the edit is always exactly what was shown.
+    const { text } = cleanArtefacts(editor.value);
+    editor.value = text;
+    updateInputCount();
+    refreshTypeList();
+    runCompile();
+  });
+
+  const dismiss = document.createElement('button');
+  dismiss.textContent = 'Leave it to me';
+  dismiss.addEventListener('click', () => {
+    clearStatus($('#status'));
+  });
+
+  actions.append(clean, dismiss);
+  el.appendChild(actions);
 }
 
 function runValidate() {

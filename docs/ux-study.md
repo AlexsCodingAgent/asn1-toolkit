@@ -1,0 +1,159 @@
+# UX study — ASN.1 Toolkit
+
+Measured against the live build (0.3.0) at https://asn1.euicc.tech, plus DOM
+inspection rather than screenshot reading. Findings are ordered by how much they
+cost a real user.
+
+---
+
+## What the tool gets right (do not regress these)
+
+- **The honesty layer.** Every failure mode has a specific message, and the
+  "what it does not do" sections name real traps: `mccMnc` not decoded, Profile
+  Elements not ASN.1, PER partial. Most tools of this kind silently guess.
+- **The lookalike warning.** Fires on the PE signature and stays silent on real
+  DER — verified both ways. Auto-opens the explainer when it triggers.
+- **Performance.** 40 types compile in 115 ms; a 7 KB TLV tree decodes in 10 ms.
+  Nothing needs optimising.
+- **Payload.** 1.46 MB total, 1.34 MB of it the wasm. Acceptable for a tool page
+  and unavoidable given the compiler is inlined.
+- **Layout at desktop widths.** Panes align, editor metrics match the highlight
+  overlay exactly, no caret drift.
+
+---
+
+## F1 — A realistic paste fails with a message that blames the user
+**Severity: high. This is the defining UX problem.**
+
+Paste ASN.1 straight out of a SGP.22 PDF — the single most likely first action —
+and the compiler says:
+
+```
+Compilation failed.
+Error matching ASN syntax at while parsing line 10, column 2.
+```
+
+Line 10 is a page header the user did not knowingly write. The message names a
+line number, implies their ASN.1 is malformed, and gives no hint that the fault
+is PDF furniture. **The user's reasonable conclusion is that the tool is broken
+or that they cannot write ASN.1.**
+
+The tool already contains the fix. `scripts/extract_spec_asn1.py` cleans exactly
+these artefacts, and `web/structure.js` parses the same messy input without
+complaint — on that identical paste the Structure tab cheerfully reports
+"2 types, 7 fields". So:
+
+| Tab | Same messy input |
+|---|---|
+| Structure | works — finds `OperatorId`, `StoreMetadataRequest` |
+| Compiler | fails at line 10 |
+
+The inconsistency is the point. The tool can see the junk; it just does not
+mention it where it matters.
+
+**Direction:** port the artefact detection to JS, run it on paste, and when the
+compiler fails, check whether cleaning would have succeeded. If it would, say so
+and offer a one-click **"Clean up PDF artefacts (3 lines)"** action. That converts
+a dead end into the tool's best teaching moment — and it teaches the real lesson,
+which is that spec PDFs are not source code.
+
+---
+
+## F2 — Trailing bytes after a complete element are a warning, not an error
+**Severity: medium. Correctness signal.**
+
+```
+30 03 02 01 05 ff ff ff
+-> "Decoded with caveats — Stopped at offset 5: truncated multi-byte"
+```
+
+Three unaccounted bytes should be a hard error. Leftover data means the input is
+not what the user believes it is, and that is precisely the class of mistake this
+tool exists to catch.
+
+**Counter-check, so this is not over-called:** `30 03 02 01 05 02 01 09` is
+correctly read as two sibling top-level elements (8/8 bytes). Consuming all bytes
+as siblings is right; leaving bytes over is not.
+
+---
+
+## F3 — The schema-sharing model is invisible
+**Severity: medium.** Tabs 1–3 share one schema, and tab 3 only works if tab 1 is
+populated. Nothing in the UI says this. The Encoder's hint explains *when* to use
+it, not *where its schema comes from*; the Structure tab's hint says "uses the
+same input as tab 1" in prose, which is the only place it appears.
+
+A user who lands, clicks "3 Encoder", sees an empty type list and reads
+"No type selected — put a schema in tab 1 first" — that message is the sole
+discovery path, and it appears only after they have already tried.
+
+**Direction:** a persistent "schema: RSPDefinitions · 11 types" strip in the
+header, clickable to jump to tab 1. Cheap, and it makes the model obvious
+without a tutorial.
+
+---
+
+## F4 — Errors are reported only in a status bar
+**Severity: medium-low.**
+
+"line 10, column 2" is shown as prose in a panel below the editor, disconnected
+from the text it describes. In a 400-line paste the user has to count lines.
+
+**Direction:** underline or gutter-mark the offending line in the editor. The
+highlight overlay already exists and is the natural place — the line is known.
+
+---
+
+## F5 — Accessibility gaps
+**Severity: medium-low, but real.**
+
+| Issue | Detail |
+|---|---|
+| Status bars are not announced | Four `.status` elements, no `role="status"` or `aria-live`. A screen-reader user gets silence on compile success *and* on failure. |
+| Tab keyboard pattern incomplete | Arrow keys work, but `tabindex` is unmanaged — the ARIA tabs pattern wants the inactive tabs at `tabindex="-1"`. |
+| Radio groups unlabelled as groups | Three `.seg` groups (Output language / Filter / Encoding rules) carry `title` only. Not `role="radiogroup"` or `aria-label`. The individual radios *are* correctly named via wrapping labels. |
+| `Wrap: on` is a state-less toggle | Reads as a label, not a button state; no `aria-pressed`. |
+
+**Correction to my own first pass:** an early check suggested 8 unnamed inputs. It
+was wrong — the radios are wrapped in `<label>` elements, so they have implicit
+accessible names. Verified and withdrawn.
+
+---
+
+## F6 — "Wrap: on" is ambiguous and misplaced
+**Severity: low.**
+
+It toggles *output* wrapping, sits in the same row as compile actions, and its
+label states the current state without making clear it is a control. Minor, but
+it is the control most likely to be clicked by accident.
+
+---
+
+## F7 — No visible provenance for the example schemas
+**Severity: low, but it is the feature that would drive repeat visits.**
+
+The built-in example is a real, carefully-documented SGP.22 subset. Nothing links
+to a source, and the five-spec corpus under `tests/specs/` — 582 types across
+SGP.02/22/32 — is invisible in the UI.
+
+**Direction:** a small "Examples" picker offering the spec-derived modules, each
+labelled with its spec and version. Turns a test fixture into the most useful
+thing on the page for someone starting out.
+
+---
+
+## Deliberately not recommended
+
+- **Dark/light theme toggle.** The palette is matched to euicc.tech. A toggle
+  adds state to persist, a flash-of-wrong-theme risk, and a second stylesheet to
+  keep coherent. Not worth it for a tool embedded in a dark-themed site.
+- **URL-encoded sharing of schemas.** The tool's whole claim is that nothing
+  leaves the browser; a shareable URL reintroduces exactly the leak it avoids.
+  If sharing is wanted, make it a downloaded file.
+- **Syntax highlighting in the output panes.** Rust and TypeScript highlighting
+  would be genuinely nice, but the highlighter exists for ASN.1 and hex where the
+  round-trip invariant is cheap to guarantee. Two more tokenisers is real
+  surface area for decoration.
+- **Rewriting the structure parser to be a general ASN.1 parser.** It is honest
+  about its limits (no parameterised types, no information object classes) and
+  those limits do not bind the common case.
