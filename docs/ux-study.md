@@ -244,3 +244,64 @@ Six suites, 114 assertions, all run in CI alongside the five-spec parse:
 types across SGP.02/22/32) is invisible in the UI. An examples picker labelled by
 spec and version would turn a test fixture into the most useful thing on the page
 for someone starting out.
+
+---
+
+## Build 0.7.0 — the inspector now reads the schema
+
+The gap that mattered most was not in the study's original list, and it was the
+largest one: **the inspector and the schema never spoke to each other.**
+
+Pasting real eUICC hex produced a correct, useless tree:
+
+```
+APPLICATION 26 (prim) len=10
+  [89 01 26 77 36 65 43 21 09 87]
+```
+
+The schema in tab 1 says exactly what that is. It now says so:
+
+```
+Iccid APPLICATION 26 (prim) len=10
+  [89 01 26 77 36 65 43 21 09 87]
+
+OperatorId UNIVERSAL 16 (cons) len=8 @0
+  mccMnc: OCTET STRING CONTEXT 0 (prim) len=3 @2  [92 f9 18]
+  gid1:   OCTET STRING CONTEXT 1 (prim) len=1 @7  [01]
+```
+
+Four tabs that each did their own job, but the one question the tool exists to
+answer — *what are these bytes off my eUICC?* — needed all of them at once.
+
+### The design decision that shaped it
+
+A wrong field name is indistinguishable from a right one. So the matcher refuses
+rather than guesses:
+
+- `[0]` 3 bytes + `[1]` 1 byte is **equally consistent** with `OperatorId` and
+  `AuthenticateServerRequest`; both cover all 8 octets. The tool says nothing and
+  offers a type picker instead.
+- Elements no field accounts for stay unnamed.
+- Every line keeps its raw tag, so the claim can be checked rather than trusted.
+- An unlabelled tree is the safe default; a confidently mislabelled one is the trap.
+
+Getting the scoring right took three attempts — counting named fields tied, weighting
+named against unnamed tied too. Byte coverage is what separates a tight fit from a
+loose one.
+
+### Corrections made along the way
+
+**`tagging === 'AUTOMATIC'` was always false** — the parser reports the literal
+`"AUTOMATIC TAGS"`. The whole automatic-tag path was silently dead, so every field
+matched against a universal tag and nothing on the wire matched.
+
+**A leaf had no name to give.** `annotate` counted only FIELDS, so `Iccid
+::= [APPLICATION 26] OCTET STRING` — which has none — scored zero and was discarded
+even though its tag identified it exactly.
+
+**The status bar kept the previous match.** A decode that matched nothing left the
+old type named while showing a different tree: a wrong answer at full confidence.
+Now cleared before every decode.
+
+**Not a bug:** the summary and its explanation appear run-together in `textContent`
+but are separate blocks visually. Checked, not "fixed".
