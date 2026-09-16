@@ -1,8 +1,11 @@
 # UX study — ASN.1 Toolkit
 
-Measured against the live build (0.3.0) at https://asn1.euicc.tech, plus DOM
-inspection rather than screenshot reading. Findings are ordered by how much they
-cost a real user.
+Measured against the live build at https://asn1.euicc.tech, plus DOM inspection
+rather than screenshot reading. Findings are ordered by how much they cost a real
+user.
+
+**Status: F1–F6 are built and deployed (build 0.4.0).** See "What changed" at the
+end for what each fix does and how it is tested. F7 remains open.
 
 ---
 
@@ -157,3 +160,87 @@ thing on the page for someone starting out.
 - **Rewriting the structure parser to be a general ASN.1 parser.** It is honest
   about its limits (no parameterised types, no information object classes) and
   those limits do not bind the common case.
+
+---
+
+## What changed (build 0.4.0)
+
+### F1 — the artefact offer
+
+`web/clean.js` ports the artefact rules from `scripts/extract_spec_asn1.py`. On a
+failed compile the tool recompiles the cleaned text and offers the edit **only if
+that succeeds** — so the suggestion is never a guess, it is demonstrably the
+cause. The affected lines are listed before anything is deleted, and there is a
+way to decline.
+
+Verified on verbatim SGP.22 v3.1 source: fails at line 3, two lines removed,
+compiles 27 lines of Rust, all four members intact.
+
+The safety property that matters is not any single detection case but this: every
+real spec file under `tests/specs/` must keep its type count and field count
+through cleaning. A false positive deletes a definition and the user will not
+notice, because what remains still looks like ASN.1.
+
+### F2 — leftover bytes are an error
+
+`30 03 02 01 05 ff ff ff` previously reported "decoded with caveats" and still
+showed a tree, inviting trust in a tree that does not describe the data. Bytes
+consumed entirely as sibling elements is still correct — `30 03 02 01 05 02 01 09`
+is two siblings and is tested to stay that way.
+
+### F3 — the shared-schema strip
+
+A clickable `schema · RSPDefinitions · 11 types` indicator in the header. Tabs 1–3
+share one schema and previously nothing said so; the fact was discoverable only by
+hitting "No type selected — put a schema in tab 1" after already trying.
+
+### F4 — the error line is marked
+
+The line the parser names is banded in the editor, using the highlight overlay
+already rendered under the textarea. Positioned from the reported line number and
+verified to land there. Cleared on success, on Clear, and on typing, because a
+stale mark on edited text points at the wrong line and is worse than none.
+
+### F5 — accessibility
+
+Status regions are `role="status" aria-live="polite"`, so a screen-reader user
+hears compile results instead of silence. Tabs follow the ARIA pattern with
+managed `tabindex`. The three segmented controls are labelled `radiogroup`s.
+
+### F6 — Wrap toggle
+
+Renamed `Wrap output: on` and given `aria-pressed`.
+
+## Bugs found while building the fixes
+
+**Clear did not remove the error band**, leaving a red mark over empty text.
+Caught by an assertion, not by inspection.
+
+**F2 appeared not to work at all.** The wasm on disk was correct and correctly
+served, but the browser reused a cached binary and ran the old logic — the second
+time caching has presented as a code bug. The `BUILD` stamp is load-bearing.
+
+**The test helper was wrong.** It counted braces from the first `{` after a
+function name, so a destructuring parameter (`{ focus = false } = {}`) ended the
+scan early and the assertion inspected the wrong region — reporting a false
+failure for correct code.
+
+## Test coverage
+
+Six suites, 114 assertions, all run in CI alongside the five-spec parse:
+
+| Suite | Assertions |
+|---|---|
+| `test-format.mjs` | 18 |
+| `test-highlight.mjs` | 20 |
+| `test-clear.mjs` | 12 |
+| `test-clean.mjs` | 21 |
+| `test-ux.mjs` | 17 |
+| `enctest.mjs` | 26 |
+
+## Still open
+
+**F7 — no visible provenance for the example schemas.** The five-spec corpus (582
+types across SGP.02/22/32) is invisible in the UI. An examples picker labelled by
+spec and version would turn a test fixture into the most useful thing on the page
+for someone starting out.
