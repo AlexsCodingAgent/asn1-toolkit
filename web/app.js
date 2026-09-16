@@ -29,7 +29,7 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 // Single build stamp for every asset this page loads: the stylesheet, the wasm
 // binary, and the module URLs in index.html. Bump it on release so a redeploy is
 // never masked by a cached asset.
-const BUILD = '0.2.0';
+const BUILD = '0.3.0';
 
 
 // ---------------------------------------------------------------------------
@@ -40,29 +40,55 @@ const BUILD = '0.2.0';
 const copyTimers = new WeakMap();
 
 async function copyText(text, button, label = 'Copy') {
-  if (!text) return false;
+  if (!text) {
+    // Nothing to copy. Say so rather than flashing "Copied", which would be a
+    // lie the user only discovers when they paste.
+    if (button) flashLabel(button, 'Nothing to copy', label, false);
+    return false;
+  }
+
   let ok = false;
+  let reason = '';
   try {
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(text);
       ok = true;
+    } else {
+      reason = 'clipboard API unavailable on this origin';
     }
-  } catch {
+  } catch (e) {
+    // Distinguish the two causes, because they need different actions from the
+    // user. NotAllowedError here means the browser withheld permission; that can
+    // happen when the page is not focused, or in an automation context with no
+    // user gesture. A plain "Copy failed" leaves the user with nothing to try.
+    reason = e?.name === 'NotAllowedError'
+      ? 'the browser blocked clipboard access — click the page first, then retry'
+      : (e?.message || String(e));
     ok = false;
   }
+
   if (!ok) ok = legacyCopy(text);
 
   if (button) {
-    const prev = button.textContent;
-    button.textContent = ok ? '✓ Copied' : 'Copy failed';
-    button.classList.toggle('copied', ok);
-    clearTimeout(copyTimers.get(button));
-    copyTimers.set(button, setTimeout(() => {
-      button.textContent = label || prev;
-      button.classList.remove('copied');
-    }, 1400));
+    if (ok) flashLabel(button, '✓ Copied', label, true);
+    else flashLabel(button, 'Copy failed — select and copy manually', label, false, reason);
   }
   return ok;
+}
+
+/** Temporarily change a button's label, then restore it. */
+function flashLabel(button, shown, restore, good, reason = '') {
+  button.textContent = shown;
+  button.classList.toggle('copied', good);
+  button.title = good
+    ? 'Copied to clipboard'
+    : `Copying failed${reason ? ': ' + reason : ''}. The text is still selectable.`;
+  clearTimeout(copyTimers.get(button));
+  copyTimers.set(button, setTimeout(() => {
+    button.textContent = restore;
+    button.classList.remove('copied');
+    button.title = '';
+  }, good ? 1400 : 2600));
 }
 
 /** Fallback for non-secure contexts and older browsers. */

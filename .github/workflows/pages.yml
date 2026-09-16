@@ -56,8 +56,23 @@ jobs:
             exit 1
           fi
 
-      - name: Run formatter tests
-        run: cd web && node test-format.mjs
+      # Every suite, not just the formatter. A green deploy that skipped the
+      # encoder or highlighter tests would be evidence of nothing.
+      - name: Run test suites
+        run: |
+          cd web
+          fail=0
+          for t in test-format.mjs test-highlight.mjs test-clear.mjs enctest.mjs; do
+            echo "::group::$t"
+            node "$t" || fail=1
+            echo "::endgroup::"
+          done
+          # Parses ASN.1 extracted from five real GSMA specs; fails if any
+          # spec yields zero types, which is the silent-breakage case.
+          echo "::group::test-specs.mjs"
+          node test-specs.mjs || fail=1
+          echo "::endgroup::"
+          exit $fail
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
