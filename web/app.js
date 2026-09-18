@@ -9,6 +9,7 @@ import init, {
   validate,
   compiler_version,
   example_schema,
+  example_catalogue,
   example_minimal,
   hex_to_tree,
   example_hex,
@@ -16,6 +17,8 @@ import init, {
   example_hex_lookalike,
   example_hex_nested,
 } from './pkg/asn1_toolkit.js';
+
+import { loadCatalogue, renderOptions, provenanceText, exampleLabel } from './examples.js';
 
 import { formatRust } from './format.js';
 import { formatTypescript } from './format-ts.js';
@@ -1107,11 +1110,84 @@ function annotationExplanation() {
 // Boot
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Examples picker (F7 — provenance for the built-in schemas)
+// ---------------------------------------------------------------------------
+
+// Which ids are built-in. Anything else in the textarea is the user's own work,
+// which is why the provenance line is cleared rather than left showing a spec.
+let catalogIndex = new Map();
+
+/// Initialise the pickers from the wasm-provided catalogue.
+function initExamplePickers() {
+  let catalogue = [];
+  try {
+    catalogue = loadCatalogue(example_catalogue());
+  } catch {
+    catalogue = [];
+  }
+  catalogIndex = new Map(catalogue.map((e) => [e.id, e]));
+
+  for (const sel of [$('#examplePicker'), $('#structExamplePicker')]) {
+    if (!sel) continue;
+    renderOptions(sel, catalogue, sel === $('#examplePicker') ? 'sgp32-v12' : null);
+  }
+
+  // Default the editor to the first (SGP.32) example, so the page opens on the
+  // spec most people are looking for rather than an arbitrary one.
+  if (catalogue.length) {
+    editor.value = catalogue[0].schema;
+    setProvenance(catalogue[0]);
+  }
+}
+
+/// Load a catalogue example into the shared editor and re-run the panel.
+function loadExample(id, panel) {
+  const e = catalogIndex.get(id);
+  if (!e) return;
+  editor.value = e.schema;
+  refreshTypeList();
+  refreshDecodeTypeList();
+  updateSchemaStrip();
+  setProvenance(e);
+  if (panel === 'structure') {
+    renderStructure();
+  } else {
+    runCompile();
+  }
+  // Keep both pickers in step: the schema is shared between the panels.
+  for (const sel of [$('#examplePicker'), $('#structExamplePicker')]) {
+    if (sel && sel.value !== id) sel.value = id;
+  }
+}
+
+/// Show where the schema in the editor came from — spec and version, plus the
+/// standing reminder that it is a hand-written subset and not an extract.
+function setProvenance(entry) {
+  const el = $('#compileProvenance');
+  if (!el) return;
+  if (!entry) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.hidden = false;
+  el.textContent = provenanceText(entry);
+}
+
+/// Called whenever the editor is cleared or edited: provenance only applies to
+/// an example we loaded, so drop it the moment the text changes.
+function clearProvenanceUnlessExample() {
+  const src = editor.value;
+  const match = [...catalogIndex.values()].find((e) => e.schema === src);
+  setProvenance(match || null);
+}
+
 function wireButtons() {
   // Panel 1
   $('#btnCompile').addEventListener('click', runCompile);
   $('#btnValidate').addEventListener('click', runValidate);
-  $('#btnExample').addEventListener('click', () => { editor.value = example_schema(); refreshTypeList(); refreshDecodeTypeList(); runCompile(); });
+  $('#examplePicker').addEventListener('change', (e) => loadExample(e.target.value, 'compile'));
   $('#btnMinimal').addEventListener('click', () => { editor.value = example_minimal(); refreshTypeList(); refreshDecodeTypeList(); runCompile(); });
   $('#btnClearCompiler').addEventListener('click', () => {
     editor.value = '';
@@ -1153,12 +1229,7 @@ function wireButtons() {
 
   // Panel 2
   $('#btnStructure').addEventListener('click', renderStructure);
-  $('#btnStructExample').addEventListener('click', () => {
-    editor.value = example_schema();
-    refreshTypeList(); refreshDecodeTypeList();
-    updateSchemaStrip();
-    renderStructure();
-  });
+  $('#structExamplePicker').addEventListener('change', (e) => loadExample(e.target.value, 'structure'));
   $('#btnStructCopy').addEventListener('click', (e) => {
     let text = '';
     try { text = structureSummary(); } catch { text = ''; }
@@ -1210,6 +1281,7 @@ function wireButtons() {
     refreshTypeList(); refreshDecodeTypeList();
     updateSchemaStrip();
     clearErrorLine();   // a stale mark on edited text points at the wrong line
+    clearProvenanceUnlessExample();  // provenance belongs to the example, not to edits
   });
 
   // F3: the strip is the discovery path for the shared-schema model.
@@ -1252,7 +1324,10 @@ async function boot() {
   // Must come after init(): the version string is the cache key.
   bustAssetCaches();
 
-  editor.value = example_schema();
+  // Seeds the editor from the catalogue and fills both pickers. Replaces the
+  // old hardcoded example_schema() call — the default is now whichever example
+  // the catalogue lists first.
+  initExamplePickers();
   updateInputCount();
   refreshTypeList(); refreshDecodeTypeList();
   refreshDecodeTypeList();

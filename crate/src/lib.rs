@@ -221,6 +221,80 @@ pub fn example_schema() -> String {
     include_str!("../examples/sgp22.asn").to_string()
 }
 
+/// Example schemas, labelled with their provenance.
+///
+/// Returns a JSON array of `{ id, label, spec, version, note, schema }`. The
+/// schemas are hand-authored subsets, NOT extracts — GSMA specifications are
+/// not redistributable, so the extracted corpus under `tests/specs/` stays
+/// test-only and never reaches the deployed page.
+///
+/// Built here rather than in JS so the schema text ships inside the wasm: the
+/// page must remain a single origin with no network fetch after load.
+#[wasm_bindgen]
+pub fn example_catalogue() -> String {
+    fn entry(
+        id: &str,
+        spec: &str,
+        version: &str,
+        note: &str,
+        schema: &str,
+    ) -> String {
+        format!(
+            r#"{{"id":{},"spec":{},"version":{},"note":{},"schema":{}}}"#,
+            json_str(id),
+            json_str(spec),
+            json_str(version),
+            json_str(note),
+            json_str(schema),
+        )
+    }
+    let items = [
+        entry(
+            "sgp32-v12",
+            "SGP.32",
+            "v1.2",
+            "IoT eUICC (IPA / eIM). Identifiers, operator metadata and eIM configuration.",
+            include_str!("../examples/sgp32.asn"),
+        ),
+        entry(
+            "sgp22-v31",
+            "SGP.22",
+            "v3.1",
+            "Consumer RSP. Annex H subset: profile metadata and the RSPDefinitions core.",
+            include_str!("../examples/sgp22.asn"),
+        ),
+        entry(
+            "sgp02-v42",
+            "SGP.02",
+            "v4.2",
+            "M2M / OTA. SM-SR addressing, profile state and the OTA command envelope.",
+            include_str!("../examples/sgp02.asn"),
+        ),
+    ];
+    format!("[{}]", items.join(","))
+}
+
+/// Minimal JSON string escaping. The inputs are compile-time constants, so this
+/// only has to handle the characters those files actually contain (newlines,
+/// quotes, backslashes, tabs).
+fn json_str(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
 /// A minimal schema, for a quick first look.
 #[wasm_bindgen]
 pub fn example_minimal() -> String {

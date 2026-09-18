@@ -4,8 +4,9 @@ Measured against the live build at https://asn1.euicc.tech, plus DOM inspection
 rather than screenshot reading. Findings are ordered by how much they cost a real
 user.
 
-**Status: F1–F6 are built and deployed (build 0.4.0).** See "What changed" at the
-end for what each fix does and how it is tested. F7 remains open.
+**Status: F1–F7 are built and deployed (build 0.8.0).** See "What changed" at the
+end for what each fix does and how it is tested. Nothing in this study is still
+open.
 
 ---
 
@@ -134,14 +135,62 @@ it is the control most likely to be clicked by accident.
 
 ## F7 — No visible provenance for the example schemas
 **Severity: low, but it is the feature that would drive repeat visits.**
+**Status: BUILT (build 0.8.0).**
 
-The built-in example is a real, carefully-documented SGP.22 subset. Nothing links
-to a source, and the five-spec corpus under `tests/specs/` — 582 types across
-SGP.02/22/32 — is invisible in the UI.
+The built-in example was a real, carefully-documented SGP.22 subset, but nothing
+linked it to a source, and the five-spec corpus under `tests/specs/` was
+invisible in the UI.
 
-**Direction:** a small "Examples" picker offering the spec-derived modules, each
-labelled with its spec and version. Turns a test fixture into the most useful
-thing on the page for someone starting out.
+**Built:** the single hardcoded "SGP.22 example" button in tabs 1 and 2 is now an
+**Examples picker** offering three schemas, each labelled with its specification
+and version:
+
+| Example | What it covers |
+|---|---|
+| **SGP.32 v1.2** | IoT eUICC (IPA / eIM) — identifiers, operator metadata, eIM configuration |
+| **SGP.22 v3.1** | Consumer RSP — the Annex H subset that was previously the only example |
+| **SGP.02 v4.2** | M2M / OTA — SM-SR addressing, profile state, OTA command envelope |
+
+A **provenance line** under the toolbar names the loaded example and states, every
+time, that it is a hand-written teaching subset and **not an extract from the
+specification**. It clears the moment the text is edited, because a provenance
+line claiming SGP.02 over text the reader has rewritten is a wrong answer at full
+confidence.
+
+### The decision that shaped it: the corpus stays out
+
+The obvious implementation was to serve all five `tests/specs/` files. That was
+rejected, and the reason is recorded at the top of the README: GSMA
+specifications are not redistributable, and schemas derived from them inherit
+that. The corpus is machine-extracted type and field names pulled straight from
+five GSMA PDFs; publishing it from a site we control would be a licensing
+regression, not a feature.
+
+So the examples are **hand-authored** — small, deliberate subsets in the same
+spirit as the original `sgp22.asn`. The corpus remains test-only: `tests/` sits
+outside the deployed artifact (`upload-pages-artifact` takes `path: web`), and
+`test-examples.mjs` now **fails the build if a `tests/specs` path ever appears in
+code that ships.**
+
+The catalogue is built inside the wasm (`lib.rs::example_catalogue`) rather than
+fetched, so the page keeps its single-origin, no-network-after-load property.
+
+### A real error this surfaced
+
+The first draft of `sgp32.asn` declared `Eid ::= [APPLICATION 26] OCTET STRING
+(SIZE(16))` alongside `Iccid ::= [APPLICATION 26] OCTET STRING (SIZE(10))`. Both
+carried the same tag, so the decoder could name **neither** — it correctly
+refused, and `test-annotate.mjs` caught it.
+
+Checking the extracted corpus showed the example was wrong, not the decoder:
+SGP.22 encodes the EID inline as `eidValue [APPLICATION 26] Octet16` inside
+`GetEuiccDataResponse`; it is not a top-level tagged type. The fix was to stop
+inventing a tag the specs do not use. All three examples now have exactly one
+APPLICATION 26 type, `Iccid`.
+
+This is the failure mode the codebase already treats as the worst one, arriving
+from the direction nobody expects: not a wrong label, but a schema that made the
+right answer underivable.
 
 ---
 
@@ -240,10 +289,9 @@ Six suites, 114 assertions, all run in CI alongside the five-spec parse:
 
 ## Still open
 
-**F7 — no visible provenance for the example schemas.** The five-spec corpus (582
-types across SGP.02/22/32) is invisible in the UI. An examples picker labelled by
-spec and version would turn a test fixture into the most useful thing on the page
-for someone starting out.
+Nothing. F7 (provenance for the example schemas) was the last item, and it is
+built — see its entry above. The corpus under `tests/specs/` remains test-only by
+design, which is a constraint rather than an open task.
 
 ---
 

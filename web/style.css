@@ -134,6 +134,31 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 button.copied { border-color: var(--good); color: var(--good); }
 .spacer { flex: 1; }
 
+/* ---------- examples picker (F7) ---------- */
+/* Matches the button metrics so the toolbar stays on one visual baseline. */
+.picker { display: inline-flex; align-items: center; gap: 7px; }
+.picker-label {
+  font-size: .8rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.picker select {
+  font: inherit; font-size: .85rem; padding: 6px 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink-dim);
+  cursor: pointer; transition: .12s; max-width: 15rem;
+}
+.picker select:hover, .picker select:focus {
+  border-color: var(--accent); color: var(--accent); outline: none;
+}
+
+/* Provenance line: states which spec and version the loaded schema came from,
+   and that it is a hand-written subset rather than an extract. */
+#compileProvenance {
+  margin: 0 0 13px; padding: 9px 12px;
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border-radius: 0 8px 8px 0;
+}
+
 /* ---------- panes ---------- */
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; align-items: stretch; }
 .grid.wide-left { grid-template-columns: 1.25fr 1fr; }

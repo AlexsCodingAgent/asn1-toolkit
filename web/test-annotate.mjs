@@ -62,6 +62,9 @@ const put = (hex) => page.evaluate((h) => {
   e.value = h;
   e.dispatchEvent(new Event('input', { bubbles: true }));
 }, hex);
+// Load a built-in example through the picker. Replaces the old #btnExample
+// button, which became a <select> over three labelled examples (F7).
+const selectExample = (id) => page.selectOption('#examplePicker', id);
 const decode = async () => { await page.click('#btnDecode'); return tree(); };
 const tree = () => page.$eval('#treeOutput', (e) => e.textContent);
 const status = () => page.$eval('#statusDecode', (e) => e.textContent);
@@ -190,7 +193,7 @@ await check('a chosen type that does not fit names nothing', async () => {
 
 await check('bytes sent from the encoder are named without guessing', async () => {
   await page.click('#tab-compile');
-  await page.click('#btnExample');
+  await selectExample('sgp32-v12');
   await page.click('#tab-encode');
   await page.selectOption('#typeSelect', 'OperatorId');
   await page.click('#btnTemplate');
@@ -205,7 +208,7 @@ await check('bytes sent from the encoder are named without guessing', async () =
 
 await check('hand-editing the hex drops the known type', async () => {
   await page.click('#tab-compile');
-  await page.click('#btnExample');
+  await selectExample('sgp32-v12');
   await page.click('#tab-encode');
   await page.selectOption('#typeSelect', 'OperatorId');
   await page.click('#btnTemplate');

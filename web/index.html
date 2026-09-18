@@ -47,13 +47,18 @@
         <label><input type="radio" name="backend" value="typescript"><span>TypeScript</span></label>
       </div>
       <button class="primary" id="btnCompile">Compile</button>
-      <button id="btnExample">SGP.22 example</button>
+      <label class="picker">
+        <span class="picker-label">Example</span>
+        <select id="examplePicker" aria-label="Load a built-in example schema"></select>
+      </label>
       <button id="btnMinimal">Minimal</button>
       <button id="btnValidate">Validate only</button>
       <div class="spacer"></div>
       <button id="btnWrap" title="Toggle soft wrapping of the output pane" aria-pressed="true">Wrap output: on</button>
       <button id="btnClearCompiler">Clear</button>
     </div>
+
+    <p class="hint" id="compileProvenance" hidden></p>
 
     <div class="grid">
       <div class="pane">
@@ -135,7 +140,10 @@
   <section class="panel" id="panel-structure" role="tabpanel" aria-labelledby="tab-structure" hidden>
     <div class="toolbar">
       <button class="primary" id="btnStructure">Analyse</button>
-      <button id="btnStructExample">SGP.22 example</button>
+      <label class="picker">
+        <span class="picker-label">Example</span>
+        <select id="structExamplePicker" aria-label="Load a built-in example schema"></select>
+      </label>
       <div class="seg" role="radiogroup" aria-label="Filter the type list" title="Filter the type list">
         <label><input type="radio" name="sview" value="tree" checked><span>Grouped</span></label>
         <label><input type="radio" name="sview" value="flat"><span>All types</span></label>

@@ -91,6 +91,19 @@ export function compiler_version(): string;
 export function decode_to_tree(hex: string): any;
 
 /**
+ * Example schemas, labelled with their provenance.
+ *
+ * Returns a JSON array of `{ id, label, spec, version, note, schema }`. The
+ * schemas are hand-authored subsets, NOT extracts — GSMA specifications are
+ * not redistributable, so the extracted corpus under `tests/specs/` stays
+ * test-only and never reaches the deployed page.
+ *
+ * Built here rather than in JS so the schema text ships inside the wasm: the
+ * page must remain a single origin with no network fetch after load.
+ */
+export function example_catalogue(): string;
+
+/**
  * A valid DER sample for the hex inspector: SGP.22 `OperatorId` with mccMnc
  * 246/81, the worked example from SGP.22 §5.7.2.
  */
@@ -184,6 +197,7 @@ export interface InitOutput {
     readonly compiler_version: () => [number, number];
     readonly config_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
     readonly decode_to_tree: (a: number, b: number) => any;
+    readonly example_catalogue: () => [number, number];
     readonly example_hex: () => [number, number];
     readonly example_hex_3digit: () => [number, number];
     readonly example_hex_lookalike: () => [number, number];

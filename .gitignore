@@ -15,3 +15,11 @@ crate/target
 # Python bytecode from scripts/
 __pycache__/
 *.pyc
+
+# Node deps. CI runs `npm install --no-save playwright` to drive the button
+# audit; that lands here and must never be committed or served. gitignoring the
+# directory is what stops a stray install reaching the deployed artifact.
+node_modules/
+package-lock.json
+package.json
+

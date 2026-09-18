@@ -1,0 +1,84 @@
+-- SGP.32 v1.2 — IoT eUICC (eIM / IPA) subset.
+--
+-- Hand-written subset, in the same spirit as sgp22.asn: only the types that
+-- matter for reading profile metadata and IPA state off an IoT eUICC. The full
+-- module is far larger and is not reproduced here — GSMA specifications are not
+-- redistributable, so this is a curated teaching subset, not an extract.
+--
+-- Provenance: SGP.32 v1.2, "eUICC Profile Package: Interoperable Format and
+-- IoT eUICC / IPA functionality".
+
+IotDefs DEFINITIONS AUTOMATIC TAGS EXTENSIBILITY IMPLIED ::=
+BEGIN
+
+-- ── Basic octet conventions (SGP.32 §2.6, shared with SGP.22) ────────────
+
+Octet8  ::= OCTET STRING (SIZE(8))
+Octet16 ::= OCTET STRING (SIZE(16))
+Octet32 ::= OCTET STRING (SIZE(32))
+
+-- ── Identifiers ──────────────────────────────────────────────────────────
+
+-- ICCID as coded in EFiccid; APPLICATION 26 -> tag 5A
+Iccid ::= [APPLICATION 26] OCTET STRING (SIZE(10))
+
+-- EID as coded in EFekaui, per SGP.29. NOT declared with APPLICATION 26 as a
+-- top-level type: in SGP.22's GetEuiccDataResponse the EID appears inline as
+-- `eidValue [APPLICATION 26] Octet16`. Declaring it as its own tagged type here
+-- would collide with Iccid's APPLICATION 26 and make the decoder unable to name
+-- either — a real ambiguity, and one the specs do not actually have.
+Eid ::= Octet16
+
+-- ── Operator / profile metadata ──────────────────────────────────────────
+
+-- SGP.32 §5.9.2. mccMnc is 3 octets coded per 3GPP TS 24.008.
+OperatorId ::= SEQUENCE {
+    mccMnc   OCTET STRING (SIZE(3)),
+    gid1     OCTET STRING (SIZE(1)) OPTIONAL,
+    gid2     OCTET STRING (SIZE(1)) OPTIONAL
+}
+
+-- Profile element header used throughout the profile package.
+ProfileElement ::= SEQUENCE {
+    type     [0] INTEGER (0..255),
+    length   [1] INTEGER (0..65535),
+    body     [2] OCTET STRING OPTIONAL
+}
+
+-- ── IPA / eIM state (SGP.32 §5.x) ────────────────────────────────────────
+
+-- The IPA's view of which profile is active. Only one may be enabled at a time.
+IpaState ::= SEQUENCE {
+    enabledProfile   Iccid OPTIONAL,
+    installedProfiles SEQUENCE OF Iccid,
+    eimConfigured    BOOLEAN
+}
+
+-- A short identifier the eIM uses to address a profile.
+IpaProfileId ::= OCTET STRING (SIZE(8))
+
+-- ── eIM configuration ────────────────────────────────────────────────────
+
+-- Transport the IPA uses to reach the eIM. Indicates whether the device is
+-- reachable directly (push) or must poll.
+EimConfigurationData ::= SEQUENCE {
+    eimId        UTF8String (SIZE(1..64)),
+    eimFqdn      UTF8String (SIZE(1..255)) OPTIONAL,
+    eimPublicKey EimPublicKey OPTIONAL
+}
+
+EimPublicKey ::= SEQUENCE {
+    curve   OBJECT IDENTIFIER,
+    x       OCTET STRING (SIZE(32)),
+    y       OCTET STRING (SIZE(32))
+}
+
+-- ── eUICC capability reporting ───────────────────────────────────────────
+
+EuiccCapabilities ::= SEQUENCE {
+    numberOfEimSupported  INTEGER (0..8),
+    profileVersion        OCTET STRING (SIZE(3)),
+    supportsFallback      BOOLEAN
+}
+
+END

@@ -71,6 +71,17 @@ const click = (id) => page.click('#' + id);
 const text = (id) => page.$eval('#' + id, (e) => e.textContent.trim());
 const count = (sel) => page.$$eval(sel, (els) => els.length);
 
+/**
+ * Load a built-in example through the picker, the way a user does.
+ *
+ * Replaces the old `click('btnExample')`: the single hardcoded button became a
+ * <select> over three labelled examples (F7), so a click is no longer how the
+ * example is chosen. selectOption fires the change event the app listens for.
+ */
+const DEFAULT_EXAMPLE = 'sgp32-v12';
+const selectExample = (id, picker = 'examplePicker') =>
+  page.selectOption('#' + picker, id);
+
 
 /**
  * Click a segmented option the way a user does.
@@ -94,7 +105,7 @@ async function ensureSchema(page) {
   const active = await page.$eval('#tab-compile', (e) => e.getAttribute('aria-selected'));
   if (active !== 'true') await page.click('#tab-compile');
   const len = await page.$eval('#input', (e) => e.value.length);
-  if (len < 100) await page.click('#btnExample');
+  if (len < 100) await selectExample(DEFAULT_EXAMPLE);
 }
 
 async function ensureDecoded(page) {
@@ -120,9 +131,53 @@ await check('Compile produces output', async () => {
 });
 
 await check('SGP.22 example loads and compiles', async () => {
-  await click('btnExample');
+  await selectExample('sgp22-v31');
   assert.ok((await text('status')).includes('Compiled'), 'example did not compile');
   assert.ok((await page.$eval('#input', (e) => e.value.length)) > 500, 'example truncated');
+});
+
+// F7: the picker must offer every example with its spec AND version, and the
+// provenance line must name which one is loaded. Without the version a schema
+// cannot be cited, which was the whole complaint.
+await check('picker offers every example, labelled by spec and version', async () => {
+  const opts = await page.$$eval('#examplePicker option',
+    (els) => els.map((e) => ({ value: e.value, label: e.textContent.trim() })));
+  assert.equal(opts.length, 3, 'expected three examples, got ' + opts.length);
+  for (const o of opts) {
+    assert.match(o.label, /^SGP\.\d+ v\d+\.\d+$/, `bad label: ${o.label}`);
+  }
+  const ids = opts.map((o) => o.value);
+  for (const need of ['sgp32-v12', 'sgp22-v31', 'sgp02-v42']) {
+    assert.ok(ids.includes(need), `missing example ${need}`);
+  }
+});
+
+await check('provenance names the loaded example', async () => {
+  await selectExample('sgp02-v42');
+  const prov = await page.$eval('#compileProvenance', (e) => ({
+    hidden: e.hidden, text: e.textContent,
+  }));
+  assert.equal(prov.hidden, false, 'provenance hidden for a catalogue example');
+  assert.ok(prov.text.includes('SGP.02 v4.2'), 'provenance does not name the spec/version');
+  assert.ok(/not an extract/i.test(prov.text), 'provenance does not disclaim extract status');
+});
+
+await check('editing the schema clears the provenance', async () => {
+  // A line claiming SGP.02 over text the user rewrote is a wrong answer at full
+  // confidence, which is the failure this codebase treats as the worst kind.
+  await selectExample('sgp02-v42');
+  await page.$eval('#input', (e) => {
+    e.value += '\n-- edited by the test\n';
+    e.dispatchEvent(new Event('input'));
+  });
+  const hidden = await page.$eval('#compileProvenance', (e) => e.hidden);
+  assert.equal(hidden, true, 'provenance survived an edit');
+});
+
+await check('both pickers stay in step', async () => {
+  await selectExample('sgp32-v12');
+  const other = await page.$eval('#structExamplePicker', (e) => e.value);
+  assert.equal(other, 'sgp32-v12', 'struct picker disagrees about the shared schema');
 });
 
 await check('Minimal loads a small schema', async () => {
@@ -149,7 +204,7 @@ await check('Wrap toggles pressed state and label', async () => {
 });
 
 await check('Clear empties input, output and status', async () => {
-  await click('btnExample');
+  await selectExample(DEFAULT_EXAMPLE);
   await click('btnClearCompiler');
   assert.equal(await page.$eval('#input', (e) => e.value), '', 'input not cleared');
   assert.equal(await text('output'), '', 'output not cleared');
@@ -161,7 +216,7 @@ await check('Download is offered only with output', async () => {
   await click('btnClearCompiler');
   const disabledNoOut = await page.$eval('#btnDownload', (e) =>
     e.disabled || e.getAttribute('aria-disabled') === 'true' || e.classList.contains('off'));
-  await click('btnExample');
+  await selectExample(DEFAULT_EXAMPLE);
   // Either it is disabled when empty, or clicking it does not throw.
   assert.ok(typeof disabledNoOut === 'boolean', 'no disabled state reported');
 });
@@ -179,7 +234,7 @@ await check('Analyse renders types and fields', async () => {
 
 await check('Structure example loads a schema', async () => {
   await click('tab-structure');
-  await click('btnStructExample');
+  await selectExample(DEFAULT_EXAMPLE, 'structExamplePicker');
   assert.ok((await count('#structure .tname')) > 0, 'no types after example');
 });
 
@@ -195,7 +250,7 @@ await check('Copy summary yields the extracted structure', async () => {
 
 await check('all four encoding rules produce bytes', async () => {
   await click('tab-compile');
-  await click('btnExample');
+  await selectExample(DEFAULT_EXAMPLE);
   await click('tab-encode');
   await page.selectOption('#typeSelect', 'OperatorId');
   await click('btnTemplate');

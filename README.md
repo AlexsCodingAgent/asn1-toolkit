@@ -16,16 +16,25 @@ specifications are not redistributable, and schemas derived from them inherit th
 | **3 Encoder** | Values → DER / BER / CER / PER bytes, driven by the schema |
 | **4 Byte inspector** | Raw hex → BER/DER TLV tree, with lookalike detection |
 
+Every tab loads its input from the same **Examples picker**: three schemas
+labelled with their specification and version (SGP.32 v1.2, SGP.22 v3.1, SGP.02
+v4.2), each shown with a provenance line. They are **hand-written teaching
+subsets**, not extracts — see the note above about redistribution.
+
 ## Layout
 
 ```
 crate/                  Rust crate — wasm-bindgen over rasn-compiler
   src/lib.rs              the wasm exports
   src/hexdump.rs          byte decoder + lookalike detection
-  examples/sgp22.asn      the built-in example
+  examples/               the built-in example schemas (hand-authored subsets)
+    sgp32.asn               SGP.32 v1.2 — IoT eUICC (IPA / eIM)
+    sgp22.asn               SGP.22 v3.1 — consumer RSP, Annex H subset
+    sgp02.asn               SGP.02 v4.2 — M2M / OTA
 web/                    static site — the only thing deployed
   index.html              the four tabs
   app.js                  wiring, copy/download, cross-tab flow
+  examples.js             the Examples picker + provenance line
   style.css               navy theme matching euicc.tech
   highlight.js            ASN.1 + hex syntax highlighting
   structure.js            schema structure extraction

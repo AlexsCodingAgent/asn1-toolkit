@@ -25,6 +25,7 @@ export const compile_to_typescript: (a: number, b: number) => [number, number, n
 export const compiler_version: () => [number, number];
 export const config_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
 export const decode_to_tree: (a: number, b: number) => any;
+export const example_catalogue: () => [number, number];
 export const example_hex: () => [number, number];
 export const example_hex_3digit: () => [number, number];
 export const example_hex_lookalike: () => [number, number];

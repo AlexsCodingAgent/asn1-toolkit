@@ -326,6 +326,31 @@ export function decode_to_tree(hex) {
 }
 
 /**
+ * Example schemas, labelled with their provenance.
+ *
+ * Returns a JSON array of `{ id, label, spec, version, note, schema }`. The
+ * schemas are hand-authored subsets, NOT extracts — GSMA specifications are
+ * not redistributable, so the extracted corpus under `tests/specs/` stays
+ * test-only and never reaches the deployed page.
+ *
+ * Built here rather than in JS so the schema text ships inside the wasm: the
+ * page must remain a single origin with no network fetch after load.
+ * @returns {string}
+ */
+export function example_catalogue() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.example_catalogue();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
  * A valid DER sample for the hex inspector: SGP.22 `OperatorId` with mccMnc
  * 246/81, the worked example from SGP.22 §5.7.2.
  * @returns {string}
