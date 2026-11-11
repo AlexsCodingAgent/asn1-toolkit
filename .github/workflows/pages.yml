@@ -27,7 +27,10 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # The cluster's runner, from gh-actions-iac. `runs-on` is the scale set's name and nothing else:
+    # an ARC runner carries that label and no other, so asking for `self-hosted` as well queues
+    # the job forever beside an idle pod.
+    runs-on: asn1
     steps:
       - uses: actions/checkout@v4
 
@@ -191,7 +194,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: asn1
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
